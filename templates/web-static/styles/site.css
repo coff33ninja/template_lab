@@ -1,0 +1,22 @@
+:root {
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  color: #121212;
+  background: linear-gradient(160deg, #f4f7fb, #e7efe3);
+}
+
+body {
+  margin: 0;
+}
+
+.container {
+  max-width: 760px;
+  margin: 80px auto;
+  padding: 24px;
+  background: #ffffffd9;
+  border: 1px solid #dbe3d2;
+  border-radius: 12px;
+}
+
+button {
+  padding: 8px 12px;
+}
