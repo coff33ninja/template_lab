@@ -153,15 +153,27 @@ try {
     Write-Output "Extracting archive ..."
     Expand-Archive -LiteralPath $archivePath -DestinationPath $tempRoot -Force
 
-    $extracted = Get-ChildItem -LiteralPath $tempRoot -Directory | Where-Object { $_.Name -ne "__MACOSX" } | Select-Object -First 1
-    if ($null -eq $extracted) {
-        throw "Could not find extracted template folder."
+    $scriptCandidates = [System.Collections.Generic.List[string]]::new()
+
+    $rootCandidate = Join-Path $tempRoot "scripts\new-project.ps1"
+    if (Test-Path -LiteralPath $rootCandidate -PathType Leaf) {
+        $scriptCandidates.Add($rootCandidate)
     }
 
-    $newProjectScript = Join-Path $extracted.FullName "scripts\new-project.ps1"
-    if (-not (Test-Path -LiteralPath $newProjectScript -PathType Leaf)) {
+    Get-ChildItem -LiteralPath $tempRoot -Directory |
+        Where-Object { $_.Name -ne "__MACOSX" } |
+        ForEach-Object {
+            $candidate = Join-Path $_.FullName "scripts\new-project.ps1"
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                $scriptCandidates.Add($candidate)
+            }
+        }
+
+    if ($scriptCandidates.Count -eq 0) {
         throw "new-project.ps1 not found in extracted archive."
     }
+
+    $newProjectScript = $scriptCandidates[0]
 
     $specPath = $null
     if (-not [string]::IsNullOrWhiteSpace($DependencySpecFile)) {
