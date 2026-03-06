@@ -217,7 +217,7 @@
     },
     "kotlin-android": {
       "install_strategy": "gradle",
-      "check_strategy": "gradle_test",
+      "check_strategy": "gradle_help",
       "supports_additional_packages": false,
       "python_module_template": false,
       "required_tools": {
@@ -234,7 +234,8 @@
         ".gitattributes",
         "build.gradle.kts",
         "app/build.gradle.kts",
-        "app/src/main/java/com/example/app/MainActivity.kt"
+        "app/src/main/java/com/example/app/MainActivity.kt",
+        "gradle.properties"
       ],
       "entrypoint": "app/src/main/java/com/example/app/MainActivity.kt",
       "test_file": "app/src/main/res/layout/activity_main.xml"

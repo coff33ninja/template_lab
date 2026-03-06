@@ -842,6 +842,22 @@ function Invoke-TemplateChecksByStrategy {
             return
         }
 
+        "gradle_help" {
+            Push-Location $projectFullPath
+            try {
+                $gradleWrapper = Join-Path $projectFullPath "gradlew.bat"
+                if (Test-Path -LiteralPath $gradleWrapper -PathType Leaf) {
+                    Invoke-ExternalCommand -Command $gradleWrapper -Arguments @("help") -FailureMessage "Gradle help failed."
+                } else {
+                    Invoke-ExternalCommand -Command "gradle" -Arguments @("help") -FailureMessage "Gradle help failed."
+                }
+            }
+            finally {
+                Pop-Location
+            }
+            return
+        }
+
         default {
             throw "Unknown check strategy '$Strategy' for template '$TemplateName'."
         }
