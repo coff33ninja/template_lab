@@ -734,6 +734,13 @@ function Invoke-TemplateChecksByStrategy {
                 Invoke-PythonPytest -ProjectPath $projectFullPath -PythonVenv $PythonVenv -PythonTargetVersion $PythonTargetVersion -FailureMessage "Python tests failed."
 
                 if (Get-Command "docker" -ErrorAction SilentlyContinue) {
+                    $envFilePath = Join-Path $projectFullPath ".env"
+                    $envExamplePath = Join-Path $projectFullPath ".env.example"
+                    if (-not (Test-Path -LiteralPath $envFilePath -PathType Leaf) -and (Test-Path -LiteralPath $envExamplePath -PathType Leaf)) {
+                        Add-AuditEntry -Message "docker-env-seed: .env from .env.example"
+                        Copy-Item -LiteralPath $envExamplePath -Destination $envFilePath -Force
+                    }
+
                     Invoke-ExternalCommand -Command "docker" -Arguments @("compose", "config", "-q") -FailureMessage "docker compose config validation failed."
                 } else {
                     $message = "Skipping Docker compose validation because docker is not installed."
