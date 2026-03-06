@@ -1261,6 +1261,7 @@ $tokens = @{
     "{{project_name}}"   = $Name
     "{{project_slug}}"   = $slug
     "{{project_module}}" = $module
+    "__PROJECT_SLUG__"   = $slug
 }
 
 $scaffoldTokens = @{
