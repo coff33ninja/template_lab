@@ -1,0 +1,10 @@
+{
+  "dart.analysisExcludedFolders": [
+    "templates/flutter-app",
+    "templates/flutter-full-app",
+    "_tmp",
+    "_tmp_new",
+    "_tmp_boot",
+    "_tmp_repo_test"
+  ]
+}
