@@ -73,6 +73,17 @@ pwsh -File .\scripts\preflight.ps1 -Phase all -FailOnMissing
 
 Install or upgrade missing/outdated toolchain dependencies with `winget` and `choco` fallback:
 
+Method reference:
+
+- `-Phase all`: manifest-driven run across install + check tool requirements.
+- `-InstallMissing:$true -UpgradeExisting:$false`: install-only mode (no upgrades).
+- `-Template <name> -Phase install`: scope to one template's install requirements.
+- `-Tools <list>`: override manifest resolution and target only the listed tools.
+- `-Tools python -PythonVersion <x.y>`: force Python package selection by version.
+- `-OpenNewShell`: refresh env and start a new shell so PATH changes are active.
+- `-UpdatePackageManagers -PackageManagersOnly`: manager maintenance without tool installs.
+- `-AllowBootstrapScript`: enables Chocolatey community bootstrap script fallback.
+
 ```powershell
 # Manifest-driven (all templates, install + check tools)
 pwsh -File .\scripts\setup-toolchain.ps1 -Phase all
@@ -194,6 +205,11 @@ pwsh -File .\scripts\new-project.ps1 -Template python-tool -Name py-lab -Install
 
 `new-project.ps1` can call `scripts/init-repo.ps1` directly.
 
+Method reference:
+
+- `-InitGit`: initialize local git repo and first commit only.
+- `-InitGit -CreateGitHub -Push`: create remote repo via `gh` and push initial branch.
+
 ```powershell
 pwsh -File .\scripts\new-project.ps1 -Template go-cli-tool -Name go-cli -InitGit
 pwsh -File .\scripts\new-project.ps1 -Template go-cli-tool -Name go-cli -InitGit -CreateGitHub -Visibility private -Push
@@ -202,6 +218,13 @@ pwsh -File .\scripts\new-project.ps1 -Template go-cli-tool -Name go-cli -InitGit
 ## Secure IRM bootstrap
 
 `scripts/bootstrap.ps1` now supports pinned tags and SHA256 verification.
+
+Method reference:
+
+- `irm` inline: fastest one-liner, no local clone required.
+- local `pwsh -File`: use checked-in/local script path, avoids inline remote execution.
+- `-RefType tag` + checksum: stable/reproducible and preferred for production bootstrap.
+- `-RefType branch` + `-AllowMutableRef -AllowUnverified`: explicitly insecure dev fallback.
 
 Preferred flow (tag + release checksum asset):
 
@@ -248,6 +271,33 @@ Mutable branch fallback (intentionally explicit):
 pwsh -File .\scripts\bootstrap.ps1 `
   -Template web-static `
   -Name web-lab `
+  -Ref main `
+  -RefType branch `
+  -AllowMutableRef `
+  -AllowUnverified
+```
+
+Non-IRM equivalents (same behavior, no inline `irm`):
+
+- Tag-verified local run: safest local/cloned method.
+- Mutable branch local run: dev-only local method.
+
+```powershell
+# Tag-verified local run
+pwsh -File .\scripts\bootstrap.ps1 `
+  -Template node-api `
+  -Name api-lab `
+  -Destination C:\scipts\projects `
+  -Ref v1.0.0 `
+  -RefType tag `
+  -InstallDeps `
+  -RunChecks
+
+# Mutable branch local run (explicitly insecure)
+pwsh -File .\scripts\bootstrap.ps1 `
+  -Template web-static `
+  -Name web-lab `
+  -Destination C:\scipts\projects `
   -Ref main `
   -RefType branch `
   -AllowMutableRef `
