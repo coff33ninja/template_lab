@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"example.com/{{project_slug}}/internal/handlers"
+	"example.com/__PROJECT_SLUG__/internal/handlers"
 )
 
 func main() {

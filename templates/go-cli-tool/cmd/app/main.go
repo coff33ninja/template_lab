@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"example.com/{{project_slug}}/internal/commands"
+	"example.com/__PROJECT_SLUG__/internal/commands"
 )
 
 func main() {

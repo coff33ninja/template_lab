@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"example.com/{{project_slug}}/internal/jobs"
+	"example.com/__PROJECT_SLUG__/internal/jobs"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"example.com/{{project_slug}}/pkg/library"
+	"example.com/__PROJECT_SLUG__/pkg/library"
 )
 
 func TestCreateGreeting(t *testing.T) {

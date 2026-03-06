@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"example.com/{{project_slug}}/internal/services"
+	"example.com/__PROJECT_SLUG__/internal/services"
 )
 
 func Health(w http.ResponseWriter, _ *http.Request) {

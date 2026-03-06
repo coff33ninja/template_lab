@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 
-	"example.com/{{project_slug}}/pkg/version"
+	"example.com/__PROJECT_SLUG__/pkg/version"
 )
 
 func Run(args []string) error {

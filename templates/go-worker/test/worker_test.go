@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"example.com/{{project_slug}}/internal/jobs"
+	"example.com/__PROJECT_SLUG__/internal/jobs"
 )
 
 func TestRun(t *testing.T) {
