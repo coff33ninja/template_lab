@@ -69,6 +69,49 @@ pwsh -File .\scripts\preflight.ps1 -Template flutter-app -Phase install
 pwsh -File .\scripts\preflight.ps1 -Phase all -FailOnMissing
 ```
 
+## Toolchain bootstrap (Win10/11)
+
+Install or upgrade missing/outdated toolchain dependencies with `winget` and `choco` fallback:
+
+```powershell
+# Manifest-driven (all templates, install + check tools)
+pwsh -File .\scripts\setup-toolchain.ps1 -Phase all
+
+# Install missing only (no upgrades)
+pwsh -File .\scripts\setup-toolchain.ps1 -Phase all -InstallMissing:$true -UpgradeExisting:$false
+
+# Target one template's tools
+pwsh -File .\scripts\setup-toolchain.ps1 -Template flutter-app -Phase install
+
+# Explicit tool list
+pwsh -File .\scripts\setup-toolchain.ps1 -Tools git,python,npm,go,flutter,gradle,uv,gh,pwsh
+
+# Pin Python target version (winget/choco package selection)
+pwsh -File .\scripts\setup-toolchain.ps1 -Tools python -PythonVersion 3.13 -InstallMissing:$true -UpgradeExisting:$true
+
+# Refresh env and open a fresh shell that reruns preflight
+pwsh -File .\scripts\setup-toolchain.ps1 -Phase all -OpenNewShell
+
+# Update package managers only (winget + choco maintenance)
+pwsh -File .\scripts\setup-toolchain.ps1 -UpdatePackageManagers -PackageManagersOnly -PackageManager both
+
+# Allow choco bootstrap script fallback (last resort)
+pwsh -File .\scripts\setup-toolchain.ps1 -UpdatePackageManagers -PackageManagersOnly -AllowBootstrapScript
+```
+
+Behavior notes:
+
+- Uses `winget` first where package IDs are known and valid, then falls back to `choco`.
+- Some tools (notably `flutter`, `gradle`) are installed via `choco` by default because winget IDs are inconsistent across environments.
+- Python version is user-selectable via `-PythonVersion` (for example `3.11`, `3.12`, `3.13`).
+- Winget maintenance methods: `winget source update` -> `winget upgrade Microsoft.AppInstaller` -> `winget install Microsoft.AppInstaller` -> `choco upgrade/install winget` -> `https://aka.ms/getwinget` MSIX bootstrap.
+- Chocolatey maintenance methods: `choco upgrade chocolatey` -> `choco install chocolatey` -> `winget upgrade/install Chocolatey.Chocolatey` -> optional community bootstrap script (`-AllowBootstrapScript`).
+- Refreshes the current process environment (`PATH` and other Machine/User vars) after installs.
+- Use `-OpenNewShell` when you want a fresh terminal session after installs.
+- Use `-DryRun` to preview actions without making changes.
+- `pwsh`/`powershell` maps to PowerShell 7 (`Microsoft.PowerShell` / `powershell-core`).
+- Windows PowerShell 5.1 is OS-managed and upgrades via Windows Update, not winget/choco.
+
 ## Dry run + policies
 
 `-DryRun` shows what will happen without writing files.

@@ -95,11 +95,12 @@ if ($missing.Count -gt 0) {
     }
 
     Write-Warning $message
+    Write-Output "Tip: run 'pwsh -File .\scripts\setup-toolchain.ps1 -Phase $Phase -InstallMissing:$true -UpgradeExisting:$false' to bootstrap missing tools."
 } else {
     Write-Output "All required tools are available for phase '$Phase'."
 }
 
-$optionalTools = @("uv", "docker", "gh")
+$optionalTools = @("uv", "docker", "gh", "pwsh")
 $optionalResults = foreach ($tool in $optionalTools) {
     [pscustomobject]@{
         Tool      = $tool
