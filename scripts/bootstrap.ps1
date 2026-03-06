@@ -1,7 +1,10 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = "Template")]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Template")]
     [string]$Template,
+
+    [Parameter(Mandatory = $true, ParameterSetName = "Stack")]
+    [string]$Stack,
 
     [Parameter(Mandatory = $true)]
     [string]$Name,
@@ -10,7 +13,7 @@ param(
 
     [string]$Repo = "coff33ninja/template_lab",
 
-    [string]$Ref = "v1.0.0",
+    [string]$Ref = "v1.0.1",
 
     [ValidateSet("tag", "branch")]
     [string]$RefType = "tag",
@@ -181,14 +184,20 @@ try {
     }
 
     $newProjectArgs = @{
-        Template                = $Template
-        Name                    = $Name
-        Destination             = $Destination
-        PythonEnvManager        = $PythonEnvManager
-        PythonVenvName          = $PythonVenvName
-        InitialCommitMessage    = $InitialCommitMessage
-        DefaultBranch           = $DefaultBranch
-        Visibility              = $Visibility    }
+        Name                 = $Name
+        Destination          = $Destination
+        PythonEnvManager     = $PythonEnvManager
+        PythonVenvName       = $PythonVenvName
+        InitialCommitMessage = $InitialCommitMessage
+        DefaultBranch        = $DefaultBranch
+        Visibility           = $Visibility
+    }
+
+    if ($PSCmdlet.ParameterSetName -eq "Stack") {
+        $newProjectArgs.Stack = $Stack
+    } else {
+        $newProjectArgs.Template = $Template
+    }
 
     if ($Force) { $newProjectArgs.Force = $true }
     if ($InstallDeps) { $newProjectArgs.InstallDeps = $true }

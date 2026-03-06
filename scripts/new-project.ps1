@@ -1,7 +1,10 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = "Template")]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Template")]
     [string]$Template,
+
+    [Parameter(Mandatory = $true, ParameterSetName = "Stack")]
+    [string]$Stack,
 
     [Parameter(Mandatory = $true)]
     [string]$Name,
@@ -395,7 +398,7 @@ function Invoke-TemplateTokenReplacement {
         ".md", ".txt", ".toml", ".json", ".yaml", ".yml",
         ".ps1", ".psm1", ".cmd", ".bat", ".ini",
         ".go", ".mod", ".sum",
-        ".js", ".mjs", ".cjs", ".ts", ".tsx",
+        ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
         ".py", ".dart", ".kt", ".kts",
         ".html", ".css", ".env", ".gradle", ".xml"
     )
@@ -1001,8 +1004,246 @@ function Show-DryRunPlan {
         Write-Output "[DryRun] Would initialize git and optional GitHub remote."
     }
 }
+
+function Get-StackConfig {
+    param(
+        [Parameter(Mandatory = $true)]$Manifest,
+        [Parameter(Mandatory = $true)][string]$StackName
+    )
+
+    if (-not $Manifest.ContainsKey("stacks")) {
+        throw "Template manifest does not define any stacks."
+    }
+
+    $stacks = $Manifest["stacks"]
+    if (-not $stacks.ContainsKey($StackName)) {
+        $validStacks = @($stacks.Keys | Sort-Object) -join ", "
+        throw "Unknown stack '$StackName'. Valid stacks: $validStacks"
+    }
+
+    return $stacks[$StackName]
+}
+
+function Show-StackDryRunPlan {
+    param(
+        [Parameter(Mandatory = $true)][string]$StackName,
+        [Parameter(Mandatory = $true)][string]$StackRootPath,
+        [Parameter(Mandatory = $true)]$StackConfig
+    )
+
+    Write-Output "[DryRun] Stack:  $StackName"
+    Write-Output "[DryRun] Target: $StackRootPath"
+    if ($StackConfig.ContainsKey("description")) {
+        Write-Output "[DryRun] Description: $($StackConfig.description)"
+    }
+
+    $components = @($StackConfig.components)
+    $position = 0
+    foreach ($component in $components) {
+        $position++
+        $templateName = "$($component.template)"
+        $relativePath = if ($component.ContainsKey("path") -and -not [string]::IsNullOrWhiteSpace("$($component.path)")) { "$($component.path)" } else { $templateName }
+        $componentNameTemplate = if ($component.ContainsKey("project_name") -and -not [string]::IsNullOrWhiteSpace("$($component.project_name)")) { "$($component.project_name)" } else { "{{stack_name}}-$($relativePath -replace '[^a-zA-Z0-9]+', '-')" }
+        $componentName = ($componentNameTemplate -replace "\{\{stack_name\}\}", $Name)
+        Write-Output "[DryRun] Component ${position}: template='$templateName' path='$relativePath' name='$componentName'"
+    }
+
+    if ($InstallDeps) { Write-Output "[DryRun] Stack install requested." }
+    if ($RunChecks) { Write-Output "[DryRun] Stack checks requested." }
+    if ($IncludeLicense) { Write-Output "[DryRun] Would inject LICENSE ($LicenseType) at stack root." }
+    if ($IncludeContributing) { Write-Output "[DryRun] Would inject CONTRIBUTING.md at stack root." }
+    if ($IncludeCodeOfConduct) { Write-Output "[DryRun] Would inject CODE_OF_CONDUCT.md at stack root." }
+    if (-not [string]::IsNullOrWhiteSpace($PostCreateScript)) { Write-Output "[DryRun] Would run post-create hook at stack root: $PostCreateScript" }
+    if ($InitGit -or $CreateGitHub -or $Push) { Write-Output "[DryRun] Would initialize git/GitHub at stack root." }
+}
+
+function Invoke-StackPresetScaffold {
+    param(
+        [Parameter(Mandatory = $true)]$Manifest,
+        [Parameter(Mandatory = $true)][string]$StackName,
+        [Parameter(Mandatory = $true)][string]$StackProjectName,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot
+    )
+
+    $stackConfig = Get-StackConfig -Manifest $Manifest -StackName $StackName
+    $components = @($stackConfig.components)
+    if ($components.Count -eq 0) {
+        throw "Stack '$StackName' has no components."
+    }
+
+    $stackRootPath = Join-Path $DestinationRoot $StackProjectName
+    Add-AuditEntry -Message "stack-selected: $StackName"
+    Add-AuditEntry -Message "stack-target: $stackRootPath"
+
+    if ($AdditionalPackages.Count -gt 0) {
+        Write-Warning "AdditionalPackages are ignored in stack mode. Use DependencySpecFile for per-template package control."
+    }
+
+    if ($DryRun) {
+        Show-StackDryRunPlan -StackName $StackName -StackRootPath $stackRootPath -StackConfig $stackConfig
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $DestinationRoot -PathType Container)) {
+        New-Item -Path $DestinationRoot -ItemType Directory -Force | Out-Null
+        Add-AuditEntry -Message "destination-created: $DestinationRoot"
+    }
+
+    if (Test-Path -LiteralPath $stackRootPath) {
+        if (-not $Force) {
+            throw "Target already exists: $stackRootPath. Use -Force to overwrite."
+        }
+
+        Remove-Item -LiteralPath $stackRootPath -Recurse -Force -ErrorAction Stop
+        Add-AuditEntry -Message "stack-target-removed: $stackRootPath"
+    }
+
+    New-Item -Path $stackRootPath -ItemType Directory -Force | Out-Null
+    Add-AuditEntry -Message "stack-target-created: $stackRootPath"
+
+    $componentIndex = 0
+    foreach ($component in $components) {
+        $componentIndex++
+        $templateName = "$($component.template)"
+        if ([string]::IsNullOrWhiteSpace($templateName)) {
+            throw "Stack '$StackName' component #$componentIndex is missing 'template'."
+        }
+        if (-not $Manifest.templates.ContainsKey($templateName)) {
+            throw "Stack '$StackName' component #$componentIndex references unknown template '$templateName'."
+        }
+
+        $relativePath = if ($component.ContainsKey("path") -and -not [string]::IsNullOrWhiteSpace("$($component.path)")) {
+            "$($component.path)".Replace("/", "\").Trim("\")
+        } else {
+            $templateName
+        }
+
+        $componentNameTemplate = if ($component.ContainsKey("project_name") -and -not [string]::IsNullOrWhiteSpace("$($component.project_name)")) {
+            "$($component.project_name)"
+        } else {
+            "{{stack_name}}-$($relativePath -replace '[^a-zA-Z0-9]+', '-')"
+        }
+
+        $componentName = ($componentNameTemplate -replace "\{\{stack_name\}\}", $StackProjectName)
+        $componentName = ($componentName -replace "[^a-zA-Z0-9_-]+", "-").Trim("-_")
+        if ([string]::IsNullOrWhiteSpace($componentName)) {
+            $componentName = "component-$componentIndex"
+        }
+
+        $componentInstallDeps = $InstallDeps
+        if ($component.ContainsKey("install_deps") -and -not [bool]$component.install_deps) {
+            $componentInstallDeps = $false
+        }
+
+        $componentRunChecks = $RunChecks
+        if ($component.ContainsKey("run_checks") -and -not [bool]$component.run_checks) {
+            $componentRunChecks = $false
+        }
+
+        $childArgs = @(
+            "-NoProfile",
+            "-File", $PSCommandPath,
+            "-Template", $templateName,
+            "-Name", $componentName,
+            "-Destination", $stackRootPath,
+            "-PythonEnvManager", $PythonEnvManager,
+            "-PythonVenvName", $PythonVenvName
+        )
+
+        if ($Force) { $childArgs += "-Force" }
+        if ($componentInstallDeps) { $childArgs += "-InstallDeps" }
+        if ($componentRunChecks) { $childArgs += "-RunChecks" }
+        if ($SkipChecksOnMissingTool) { $childArgs += "-SkipChecksOnMissingTool" }
+        if (-not [string]::IsNullOrWhiteSpace($DependencySpecFile)) { $childArgs += @("-DependencySpecFile", $DependencySpecFile) }
+        if (-not [string]::IsNullOrWhiteSpace($PythonVersion)) { $childArgs += @("-PythonVersion", $PythonVersion) }
+
+        Add-AuditEntry -Message "stack-component: template=$templateName path=$relativePath name=$componentName"
+        Invoke-ExternalCommand -Command "pwsh" -Arguments $childArgs -FailureMessage "Failed to scaffold stack component '$templateName'."
+
+        $componentGeneratedPath = Join-Path $stackRootPath $componentName
+        $componentFinalPath = Join-Path $stackRootPath $relativePath
+
+        if ($componentGeneratedPath -ne $componentFinalPath) {
+            if (-not (Test-Path -LiteralPath $componentGeneratedPath -PathType Container)) {
+                throw "Expected generated stack component path not found: $componentGeneratedPath"
+            }
+
+            $componentFinalParent = Split-Path -Parent $componentFinalPath
+            if (-not [string]::IsNullOrWhiteSpace($componentFinalParent) -and -not (Test-Path -LiteralPath $componentFinalParent -PathType Container)) {
+                New-Item -Path $componentFinalParent -ItemType Directory -Force | Out-Null
+            }
+
+            if (Test-Path -LiteralPath $componentFinalPath) {
+                if ($Force) {
+                    Remove-Item -LiteralPath $componentFinalPath -Recurse -Force -ErrorAction Stop
+                } else {
+                    throw "Stack component target path already exists: $componentFinalPath"
+                }
+            }
+
+            Move-Item -LiteralPath $componentGeneratedPath -Destination $componentFinalPath
+            Add-AuditEntry -Message "stack-component-moved: $componentGeneratedPath -> $componentFinalPath"
+        }
+    }
+
+    $stackIdentity = Get-ProjectIdentity -ProjectName $StackProjectName
+    $stackScaffoldTokens = @{
+        "{{project_name}}" = $StackProjectName
+        "{{project_slug}}" = $stackIdentity.slug
+        "{{project_module}}" = $stackIdentity.module
+        "{{year}}" = (Get-Date).Year.ToString()
+        "{{owner}}" = if ([string]::IsNullOrWhiteSpace($env:GIT_AUTHOR_NAME)) { $env:USERNAME } else { $env:GIT_AUTHOR_NAME }
+    }
+
+    if ($IncludeLicense) {
+        Copy-ScaffoldDocument -SourceFileName ("LICENSE-$LicenseType.txt") -ProjectPath $stackRootPath -DestinationFileName "LICENSE" -Tokens $stackScaffoldTokens
+    }
+    if ($IncludeContributing) {
+        Copy-ScaffoldDocument -SourceFileName "CONTRIBUTING.md" -ProjectPath $stackRootPath -DestinationFileName "CONTRIBUTING.md" -Tokens $stackScaffoldTokens
+    }
+    if ($IncludeCodeOfConduct) {
+        Copy-ScaffoldDocument -SourceFileName "CODE_OF_CONDUCT.md" -ProjectPath $stackRootPath -DestinationFileName "CODE_OF_CONDUCT.md" -Tokens $stackScaffoldTokens
+    }
+
+    Invoke-PostCreateHook -HookPath $PostCreateScript -ProjectPath $stackRootPath -TemplateName "stack:$StackName"
+
+    if ($InitGit -or $CreateGitHub -or $Push) {
+        $initScriptPath = Join-Path $PSScriptRoot "init-repo.ps1"
+        if (-not (Test-Path -LiteralPath $initScriptPath -PathType Leaf)) {
+            throw "Missing bootstrap script: $initScriptPath"
+        }
+
+        $initArgs = @{
+            Path                 = $stackRootPath
+            InitialCommitMessage = $InitialCommitMessage
+            DefaultBranch        = $DefaultBranch
+            Visibility           = $Visibility
+        }
+
+        if ($CreateGitHub) { $initArgs.CreateGitHub = $true }
+        if ($Push) { $initArgs.Push = $true }
+        if (-not [string]::IsNullOrWhiteSpace($GitHubRepo)) { $initArgs.GitHubRepo = $GitHubRepo }
+
+        Add-AuditEntry -Message "init-repo: $initScriptPath"
+        & $initScriptPath @initArgs
+    }
+
+    Write-AuditFile -ProjectPath $stackRootPath
+    Write-Output "Created stack '$StackName' at '$stackRootPath'."
+    Write-Output "Audit log written to '$stackRootPath\scaffold.log'."
+}
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $manifest = Get-TemplateManifest -RepoRoot $repoRoot
+
+if ($PSCmdlet.ParameterSetName -eq "Stack") {
+    Invoke-StackPresetScaffold `
+        -Manifest $manifest `
+        -StackName $Stack `
+        -StackProjectName $Name `
+        -DestinationRoot $Destination
+    return
+}
+
 $templateConfig = Get-TemplateConfig -Manifest $manifest -TemplateName $Template
 
 $templatePath = Join-Path $repoRoot ("templates\" + $Template)

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/{{project_slug}}/schemas/message.json",
+  "title": "{{project_name}} Message",
+  "type": "object",
+  "required": ["id", "body"],
+  "properties": {
+    "id": { "type": "string" },
+    "body": { "type": "string" }
+  }
+}

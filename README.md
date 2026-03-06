@@ -21,6 +21,14 @@ Current templates:
 - `kotlin-jvm-cli`
 - `fullstack-monorepo`
 - `dockerized-service`
+- `react-vite-web`
+- `python-worker`
+- `go-worker`
+- `db-api-service`
+- `shared-contracts`
+- `python-module`
+- `typescript-library`
+- `go-module`
 - `powershell-tool`
 - `web-static`
 - `mad-lab`
@@ -31,7 +39,25 @@ Current templates:
 pwsh -File .\scripts\new-project.ps1 -Template python-tool -Name idea-scraper
 pwsh -File .\scripts\new-project.ps1 -Template go-service -Name tiny-api -Destination C:\scipts\projects
 pwsh -File .\scripts\new-project.ps1 -Template typescript-node-api -Name ts-api -Destination C:\scipts\projects -InstallDeps -RunChecks
+pwsh -File .\scripts\new-project.ps1 -Template react-vite-web -Name web-lab -Destination C:\scipts\projects -InstallDeps -RunChecks
+pwsh -File .\scripts\new-project.ps1 -Template db-api-service -Name data-api -Destination C:\scipts\projects -InstallDeps -RunChecks
 ```
+
+## Stack presets
+
+Use `-Stack` to scaffold multi-project recipes from `templates/manifest.json`.
+
+```powershell
+pwsh -File .\scripts\new-project.ps1 -Stack go-api-flutter-contracts -Name orbit -Destination C:\scipts\projects -InstallDeps -RunChecks
+pwsh -File .\scripts\new-project.ps1 -Stack db-react-worker -Name pulse -Destination C:\scipts\projects -InstallDeps -RunChecks
+pwsh -File .\scripts\new-project.ps1 -Stack library-pack -Name toolkit -Destination C:\scipts\projects -InstallDeps -RunChecks
+```
+
+Current stacks:
+
+- `go-api-flutter-contracts`
+- `db-react-worker`
+- `library-pack`
 
 ## Preflight
 
@@ -105,6 +131,8 @@ pwsh -File .\scripts\new-project.ps1 -Template python-tool -Name py-lab -Install
 pwsh -File .\scripts\new-project.ps1 -Template node-api -Name node-lab -InstallDeps -AdditionalPackages "zod@3.25.0"
 ```
 
+In `-Stack` mode, use `-DependencySpecFile` for per-template package control. `-AdditionalPackages` is intentionally ignored.
+
 Spec file input:
 
 ```json
@@ -141,6 +169,21 @@ Preferred flow (tag + release checksum asset):
   -Destination C:\scipts\projects `
   -Ref v1.0.0 `
   -RefType tag `
+  -InstallDeps `
+  -RunChecks
+```
+
+Stack flow:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap.ps1"))) `
+  -Stack library-pack `
+  -Name toolkit `
+  -Destination C:\scipts\projects `
+  -Ref main `
+  -RefType branch `
+  -AllowMutableRef `
+  -AllowUnverified `
   -InstallDeps `
   -RunChecks
 ```

@@ -1,0 +1,19 @@
+openapi: 3.1.0
+info:
+  title: {{project_name}}
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      summary: Health endpoint
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok

@@ -1,0 +1,6 @@
+{
+  "name": "@{{project_slug}}/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared API contracts for {{project_name}}"
+}

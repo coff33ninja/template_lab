@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "templates": {
     "cmd-batch-tool": {
       "install_strategy": "none",
@@ -372,6 +372,285 @@
       ],
       "entrypoint": "README.md",
       "test_file": "ideas.md"
+    },
+    "react-vite-web": {
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "npm"
+        ],
+        "check": [
+          "npm"
+        ]
+      },
+      "test_file": "tests/smoke.test.js",
+      "entrypoint": "src/main.jsx",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "package.json",
+        "vite.config.js",
+        "src/main.jsx",
+        "tests/smoke.test.js"
+      ],
+      "install_strategy": "npm",
+      "supports_additional_packages": true,
+      "check_strategy": "npm_test"
+    },
+    "python-worker": {
+      "python_module_template": true,
+      "required_tools": {
+        "install": [
+          "python"
+        ],
+        "check": [
+          "python"
+        ]
+      },
+      "test_file": "tests/test_worker.py",
+      "entrypoint": "src/app/worker.py",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "pyproject.toml",
+        "src/app/worker.py",
+        "tests/test_worker.py"
+      ],
+      "install_strategy": "python_pyproject",
+      "supports_additional_packages": true,
+      "check_strategy": "python_pytest"
+    },
+    "go-worker": {
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "go"
+        ],
+        "check": [
+          "go"
+        ]
+      },
+      "test_file": "test/worker_test.go",
+      "entrypoint": "cmd/worker/main.go",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "go.mod",
+        "cmd/worker/main.go",
+        "test/worker_test.go"
+      ],
+      "install_strategy": "go",
+      "supports_additional_packages": true,
+      "check_strategy": "go_test"
+    },
+    "db-api-service": {
+      "python_module_template": true,
+      "required_tools": {
+        "install": [
+          "python"
+        ],
+        "check": [
+          "python"
+        ]
+      },
+      "test_file": "tests/test_health.py",
+      "entrypoint": "src/app/main.py",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "pyproject.toml",
+        "alembic.ini",
+        "src/app/main.py",
+        "scripts/seed.py",
+        "tests/test_health.py"
+      ],
+      "install_strategy": "python_pyproject",
+      "supports_additional_packages": true,
+      "check_strategy": "python_pytest"
+    },
+    "shared-contracts": {
+      "python_module_template": false,
+      "required_tools": {
+        "install": [],
+        "check": []
+      },
+      "test_file": "schemas/message.schema.json",
+      "entrypoint": "openapi/openapi.yaml",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "package.json",
+        "openapi/openapi.yaml",
+        "schemas/message.schema.json"
+      ],
+      "install_strategy": "none",
+      "supports_additional_packages": false,
+      "check_strategy": "none"
+    },
+    "python-module": {
+      "python_module_template": true,
+      "required_tools": {
+        "install": [
+          "python"
+        ],
+        "check": [
+          "python"
+        ]
+      },
+      "test_file": "tests/test_core.py",
+      "entrypoint": "src/app/core.py",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "pyproject.toml",
+        "src/app/core.py",
+        "tests/test_core.py"
+      ],
+      "install_strategy": "python_pyproject",
+      "supports_additional_packages": true,
+      "check_strategy": "python_pytest"
+    },
+    "typescript-library": {
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "npm"
+        ],
+        "check": [
+          "npm"
+        ]
+      },
+      "test_file": "tests/index.test.js",
+      "entrypoint": "src/index.ts",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "package.json",
+        "tsconfig.json",
+        "src/index.ts",
+        "tests/index.test.js"
+      ],
+      "install_strategy": "npm",
+      "supports_additional_packages": true,
+      "check_strategy": "ts_npm"
+    },
+    "go-module": {
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "go"
+        ],
+        "check": [
+          "go"
+        ]
+      },
+      "test_file": "test/library_test.go",
+      "entrypoint": "pkg/library/library.go",
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "go.mod",
+        "pkg/library/library.go",
+        "test/library_test.go"
+      ],
+      "install_strategy": "go",
+      "supports_additional_packages": true,
+      "check_strategy": "go_test"
+    }
+  },
+  "stacks": {
+    "go-api-flutter-contracts": {
+      "description": "Go API + Flutter app + shared contracts workspace",
+      "components": [
+        {
+          "run_checks": true,
+          "path": "api",
+          "template": "go-service",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-api"
+        },
+        {
+          "run_checks": true,
+          "path": "mobile",
+          "template": "flutter-app",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-mobile"
+        },
+        {
+          "run_checks": false,
+          "path": "contracts",
+          "template": "shared-contracts",
+          "install_deps": false,
+          "project_name": "{{stack_name}}-contracts"
+        }
+      ]
+    },
+    "db-react-worker": {
+      "description": "DB API + React web + Python worker + shared contracts",
+      "components": [
+        {
+          "run_checks": true,
+          "path": "api",
+          "template": "db-api-service",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-api"
+        },
+        {
+          "run_checks": true,
+          "path": "web",
+          "template": "react-vite-web",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-web"
+        },
+        {
+          "run_checks": true,
+          "path": "worker",
+          "template": "python-worker",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-worker"
+        },
+        {
+          "run_checks": false,
+          "path": "contracts",
+          "template": "shared-contracts",
+          "install_deps": false,
+          "project_name": "{{stack_name}}-contracts"
+        }
+      ]
+    },
+    "library-pack": {
+      "description": "Reusable module trio: Python module + TypeScript library + Go module",
+      "components": [
+        {
+          "run_checks": true,
+          "path": "python",
+          "template": "python-module",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-py"
+        },
+        {
+          "run_checks": true,
+          "path": "typescript",
+          "template": "typescript-library",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-ts"
+        },
+        {
+          "run_checks": true,
+          "path": "go",
+          "template": "go-module",
+          "install_deps": true,
+          "project_name": "{{stack_name}}-go"
+        }
+      ]
     }
   }
 }

@@ -66,6 +66,30 @@ Workspace scaffold for API, web, mobile placeholder, and shared package.
 ## `dockerized-service`
 Docker-first FastAPI service with `Dockerfile`, `docker-compose.yml`, and healthcheck.
 
+## `react-vite-web`
+Modern React + Vite frontend scaffold with build + smoke tests.
+
+## `python-worker`
+Background worker starter for queue/cron-style automation tasks.
+
+## `go-worker`
+Go worker starter with `cmd` + `internal/jobs` layout.
+
+## `db-api-service`
+Database-backed FastAPI service with migration + seed script folders.
+
+## `shared-contracts`
+OpenAPI + JSON Schema package for cross-language contracts.
+
+## `python-module`
+Reusable Python package/module scaffold.
+
+## `typescript-library`
+Reusable TypeScript library scaffold.
+
+## `go-module`
+Reusable Go module scaffold.
+
 ## `powershell-tool`
 PowerShell utility scaffold with modules and config.
 
