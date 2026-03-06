@@ -26,6 +26,45 @@ pwsh -File .\scripts\new-project.ps1 -Template node-api -Name node-lab -Destinat
 pwsh -File .\scripts\new-project.ps1 -Template go-service -Name go-lab -Destination C:\scipts\projects -InstallDeps -RunChecks -InitGit
 ```
 
+## No Clone Bootstrap (IRM)
+
+Use this when you want to scaffold + initialize a repo without cloning/pulling `template_lab`.
+
+Quick one-liner:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap.ps1"))) `
+  -Template node-api `
+  -Name api-lab `
+  -Destination C:\scipts\projects `
+  -InstallDeps `
+  -RunChecks `
+  -InitGit
+```
+
+With GitHub repo creation and first push:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap.ps1"))) `
+  -Template python-tool `
+  -Name py-lab `
+  -Destination C:\scipts\projects `
+  -InstallDeps `
+  -RunChecks `
+  -InitGit `
+  -CreateGitHub `
+  -Visibility private `
+  -Push
+```
+
+Safer review-first flow:
+
+```powershell
+$url = "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap.ps1"
+irm $url | Set-Content .\bootstrap.ps1
+pwsh -File .\bootstrap.ps1 -Template go-service -Name go-lab -Destination C:\scipts\projects -InstallDeps -RunChecks -InitGit
+```
+
 ## Git bootstrap
 
 ```powershell
