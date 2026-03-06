@@ -13,7 +13,7 @@ param(
 
     [string]$Repo = "coff33ninja/template_lab",
 
-    [string]$Ref = "v1.0.1",
+    [string]$Ref = "v1.0.4",
 
     [ValidateSet("tag", "branch")]
     [string]$RefType = "tag",

@@ -10,6 +10,27 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Get-GradleCommandPath {
+    $command = Get-Command "gradle" -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    foreach ($scope in @("Process", "User", "Machine")) {
+        $gradleHome = [Environment]::GetEnvironmentVariable("GRADLE_HOME", $scope)
+        if ([string]::IsNullOrWhiteSpace($gradleHome)) {
+            continue
+        }
+
+        $gradleBat = Join-Path $gradleHome "bin\gradle.bat"
+        if (Test-Path -LiteralPath $gradleBat -PathType Leaf) {
+            return $gradleBat
+        }
+    }
+
+    return $null
+}
+
 function Test-Tool {
     param([Parameter(Mandatory = $true)][string]$Tool)
 
@@ -17,8 +38,11 @@ function Test-Tool {
         "python" {
             return [bool](Get-Command "python" -ErrorAction SilentlyContinue) -or [bool](Get-Command "py" -ErrorAction SilentlyContinue)
         }
+        "java" {
+            return [bool](Get-Command "java" -ErrorAction SilentlyContinue)
+        }
         "gradle" {
-            return [bool](Get-Command "gradle" -ErrorAction SilentlyContinue)
+            return [bool](Get-GradleCommandPath)
         }
         default {
             return [bool](Get-Command $Tool -ErrorAction SilentlyContinue)

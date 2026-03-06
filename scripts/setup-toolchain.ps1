@@ -14,7 +14,13 @@ param(
     [bool]$UpgradeExisting = $true,
 
     [ValidatePattern('^\d+\.\d+(\.\d+)?$')]
-    [string]$PythonVersion = "3.12",
+    [string]$PythonVersion,
+
+    [ValidatePattern('^\d+$')]
+    [string]$JavaVersion,
+
+    [ValidatePattern('^\d+\.\d+(\.\d+)?$')]
+    [string]$GradleVersion,
 
     [ValidateSet("auto", "winget", "choco", "both")]
     [string]$PackageManager = "auto",
@@ -38,6 +44,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $script:AllowBootstrapScriptPreference = [bool]$AllowBootstrapScript
+$script:LatestGradleRelease = $null
 
 function Resolve-PythonVersionSpec {
     param(
@@ -58,6 +65,124 @@ function Resolve-PythonVersionSpec {
         MajorMinor = $majorMinor
         WingetId   = "Python.Python.$majorMinor"
         ChocoId    = "python$major$minor"
+    }
+}
+
+function Resolve-JavaVersionSpec {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    if ($Version -notmatch '^\d+$') {
+        throw "Invalid JavaVersion '$Version'. Use a major version like 17 or 21."
+    }
+
+    return @{
+        WingetId = "EclipseAdoptium.Temurin.$Version.JDK"
+        ChocoId  = "temurin$Version"
+    }
+}
+
+function Get-WingetSearchOutput {
+    param(
+        [Parameter(Mandatory = $true)][string]$Query,
+        [int]$Count = 200
+    )
+
+    if (-not (Test-CommandAvailable -Name "winget")) {
+        return $null
+    }
+
+    $output = & winget search --query $Query --count $Count --disable-interactivity 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        return $null
+    }
+
+    return $output
+}
+
+function Get-LatestPythonCatalogEntry {
+    $output = Get-WingetSearchOutput -Query "Python.Python"
+    $bestMajor = $null
+    $bestMinor = $null
+
+    if (-not [string]::IsNullOrWhiteSpace($output)) {
+        foreach ($match in [regex]::Matches($output, 'Python\.Python\.(\d+)\.(\d+)\b')) {
+            $major = [int]$match.Groups[1].Value
+            $minor = [int]$match.Groups[2].Value
+            if ($major -lt 3) {
+                continue
+            }
+
+            if ($null -eq $bestMajor -or $major -gt $bestMajor -or ($major -eq $bestMajor -and $minor -gt $bestMinor)) {
+                $bestMajor = $major
+                $bestMinor = $minor
+            }
+        }
+    }
+
+    if ($null -ne $bestMajor) {
+        return @{
+            winget = "Python.Python.$bestMajor.$bestMinor"
+            choco  = "python$bestMajor$bestMinor"
+        }
+    }
+
+    return @{
+        winget = $null
+        choco  = "python"
+    }
+}
+
+function Get-LatestJavaCatalogEntry {
+    $output = Get-WingetSearchOutput -Query "EclipseAdoptium.Temurin"
+    $bestMajor = $null
+
+    if (-not [string]::IsNullOrWhiteSpace($output)) {
+        foreach ($match in [regex]::Matches($output, 'EclipseAdoptium\.Temurin\.(\d+)\.JDK\b')) {
+            $major = [int]$match.Groups[1].Value
+            if ($null -eq $bestMajor -or $major -gt $bestMajor) {
+                $bestMajor = $major
+            }
+        }
+    }
+
+    if ($null -ne $bestMajor) {
+        return @{
+            winget = "EclipseAdoptium.Temurin.$bestMajor.JDK"
+            choco  = "Temurin$bestMajor"
+        }
+    }
+
+    return @{
+        winget = $null
+        choco  = "Temurin"
+    }
+}
+
+function Get-LatestGradleRelease {
+    if ($null -ne $script:LatestGradleRelease) {
+        return $script:LatestGradleRelease
+    }
+
+    try {
+        $response = Invoke-RestMethod -Uri "https://services.gradle.org/versions/current"
+        if ([string]::IsNullOrWhiteSpace("$($response.version)")) {
+            throw "Gradle current release response did not include a version."
+        }
+
+        $script:LatestGradleRelease = @{
+            Version     = "$($response.version)"
+            DownloadUrl = "$($response.downloadUrl)"
+            ChecksumUrl = "$($response.checksumUrl)"
+            Checksum    = "$($response.checksum)"
+        }
+        return $script:LatestGradleRelease
+    }
+    catch {
+        Write-Warning "Failed to resolve latest Gradle release metadata: $($_.Exception.Message)"
+        return $null
     }
 }
 
@@ -240,6 +365,14 @@ function Get-ToolCatalog {
         choco = "golang"
     }
 
+    $catalog["java"] = @{
+        commands = @("java")
+        builtin = $false
+        winget = "EclipseAdoptium.Temurin.17.JDK"
+        choco = "temurin17"
+    }
+    $catalog["jdk"] = $catalog["java"]
+
     # "powershell" here means PowerShell 7 (pwsh). Windows PowerShell 5.1
     # is OS-managed and not upgraded through package managers.
     $catalog["pwsh"] = @{
@@ -292,8 +425,12 @@ function Get-ToolCatalog {
 
 function Get-PythonCatalogEntryOverride {
     param(
-        [Parameter(Mandatory = $true)][string]$TargetVersion
+        [string]$TargetVersion
     )
+
+    if ([string]::IsNullOrWhiteSpace($TargetVersion)) {
+        return Get-LatestPythonCatalogEntry
+    }
 
     $spec = Resolve-PythonVersionSpec -Version $TargetVersion
     return @{
@@ -302,10 +439,52 @@ function Get-PythonCatalogEntryOverride {
     }
 }
 
+function Get-JavaCatalogEntryOverride {
+    param(
+        [string]$TargetVersion
+    )
+
+    if ([string]::IsNullOrWhiteSpace($TargetVersion)) {
+        return Get-LatestJavaCatalogEntry
+    }
+
+    $spec = Resolve-JavaVersionSpec -Version $TargetVersion
+    return @{
+        winget = $spec.WingetId
+        choco  = $spec.ChocoId
+    }
+}
+
+function Get-GradleCommandPath {
+    $command = Get-Command "gradle" -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    foreach ($scope in @("Process", "User", "Machine")) {
+        $gradleHome = [Environment]::GetEnvironmentVariable("GRADLE_HOME", $scope)
+        if ([string]::IsNullOrWhiteSpace($gradleHome)) {
+            continue
+        }
+
+        $gradleBat = Join-Path $gradleHome "bin\gradle.bat"
+        if (Test-Path -LiteralPath $gradleBat -PathType Leaf) {
+            return $gradleBat
+        }
+    }
+
+    return $null
+}
+
 function Get-ToolStatus {
     param(
-        [Parameter(Mandatory = $true)][hashtable]$Definition
+        [Parameter(Mandatory = $true)][hashtable]$Definition,
+        [string]$ToolName
     )
+
+    if ($ToolName -ieq "gradle") {
+        return [bool](Get-GradleCommandPath)
+    }
 
     foreach ($cmd in @($Definition.commands)) {
         if (Test-CommandAvailable -Name $cmd) {
@@ -369,6 +548,178 @@ function Invoke-ChocoAction {
     }
 
     return $false
+}
+
+function Get-ManagedToolDirectory {
+    param(
+        [Parameter(Mandatory = $true)][string]$ToolName
+    )
+
+    return Join-Path $env:LOCALAPPDATA ("template-lab\tools\" + $ToolName)
+}
+
+function Add-PathEntry {
+    param(
+        [string]$ExistingPath,
+        [Parameter(Mandatory = $true)][string]$Entry
+    )
+
+    $normalizedEntry = $Entry.Trim().TrimEnd("\")
+    $segments = @()
+
+    foreach ($segment in @("$ExistingPath" -split ";")) {
+        $candidate = $segment.Trim()
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            $segments += $candidate
+        }
+    }
+
+    foreach ($segment in $segments) {
+        if ($segment.TrimEnd("\") -ieq $normalizedEntry) {
+            return ($segments -join ";")
+        }
+    }
+
+    if ($segments.Count -eq 0) {
+        return $Entry
+    }
+
+    return (($segments + $Entry) -join ";")
+}
+
+function Set-UserEnvironmentValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+
+    if ($DryRun) {
+        Write-Output "[DryRun] Set user env $Name=$Value"
+        return $true
+    }
+
+    $current = [Environment]::GetEnvironmentVariable($Name, "User")
+    if ($current -eq $Value) {
+        [Environment]::SetEnvironmentVariable($Name, $Value, "Process")
+        return $false
+    }
+
+    [Environment]::SetEnvironmentVariable($Name, $Value, "User")
+    [Environment]::SetEnvironmentVariable($Name, $Value, "Process")
+    return $true
+}
+
+function Ensure-UserPathEntry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Entry
+    )
+
+    $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+    $updatedPath = Add-PathEntry -ExistingPath $userPath -Entry $Entry
+
+    if ($DryRun) {
+        if ($updatedPath -ne "$userPath") {
+            Write-Output "[DryRun] Add user PATH entry: $Entry"
+            return $true
+        }
+
+        return $false
+    }
+
+    if ($updatedPath -ne "$userPath") {
+        [Environment]::SetEnvironmentVariable("PATH", $updatedPath, "User")
+    }
+
+    $processPath = Add-PathEntry -ExistingPath $env:PATH -Entry $Entry
+    $env:PATH = $processPath
+    [Environment]::SetEnvironmentVariable("PATH", $processPath, "Process")
+
+    return ($updatedPath -ne "$userPath")
+}
+
+function Invoke-GradleArchiveInstall {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("install", "upgrade")][string]$Action,
+        [string]$Version
+    )
+
+    $release = $null
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        $release = Get-LatestGradleRelease
+        if ($null -eq $release) {
+            Write-Warning "Gradle archive install requires release metadata, but latest version resolution failed."
+            return $false
+        }
+
+        $Version = $release.Version
+    }
+
+    $toolRoot = Get-ManagedToolDirectory -ToolName "gradle"
+    $versionRoot = Join-Path $toolRoot $Version
+    $gradleHome = Join-Path $versionRoot "gradle-$Version"
+    $gradleBat = Join-Path $gradleHome "bin\gradle.bat"
+    $downloadUrl = if ($null -ne $release -and -not [string]::IsNullOrWhiteSpace($release.DownloadUrl)) { $release.DownloadUrl } else { "https://services.gradle.org/distributions/gradle-$Version-bin.zip" }
+    $checksumUrl = if ($null -ne $release -and -not [string]::IsNullOrWhiteSpace($release.ChecksumUrl)) { $release.ChecksumUrl } else { "$downloadUrl.sha256" }
+
+    if ((Test-Path -LiteralPath $gradleBat -PathType Leaf) -and $Action -eq "install") {
+        [void](Set-UserEnvironmentValue -Name "GRADLE_HOME" -Value $gradleHome)
+        [void](Ensure-UserPathEntry -Entry (Join-Path $gradleHome "bin"))
+        return $true
+    }
+
+    $tempRoot = Join-Path $env:TEMP ("template-lab-gradle-" + [guid]::NewGuid().ToString("N"))
+    $zipPath = Join-Path $tempRoot "gradle-$Version-bin.zip"
+    $shaPath = Join-Path $tempRoot "gradle-$Version-bin.zip.sha256"
+
+    if ($DryRun) {
+        Write-Output "[DryRun] Invoke-WebRequest -Uri $downloadUrl -OutFile `"$zipPath`""
+        Write-Output "[DryRun] Invoke-WebRequest -Uri $checksumUrl -OutFile `"$shaPath`""
+        Write-Output "[DryRun] Expand-Archive -LiteralPath `"$zipPath`" -DestinationPath `"$versionRoot`" -Force"
+        Write-Output "[DryRun] Set user env GRADLE_HOME=$gradleHome"
+        Write-Output "[DryRun] Add user PATH entry: $(Join-Path $gradleHome 'bin')"
+        return $true
+    }
+
+    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $toolRoot -Force | Out-Null
+
+    try {
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -UseBasicParsing
+        $expectedHash = if ($null -ne $release -and -not [string]::IsNullOrWhiteSpace($release.Checksum)) {
+            $release.Checksum.ToLowerInvariant()
+        } else {
+            Invoke-WebRequest -Uri $checksumUrl -OutFile $shaPath -UseBasicParsing
+            ((Get-Content -LiteralPath $shaPath -Raw).Trim() -split "\s+")[0].ToLowerInvariant()
+        }
+        $actualHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -ne $expectedHash) {
+            throw "Gradle archive checksum mismatch. Expected '$expectedHash', got '$actualHash'."
+        }
+
+        if (Test-Path -LiteralPath $versionRoot) {
+            Remove-Item -LiteralPath $versionRoot -Recurse -Force
+        }
+
+        New-Item -ItemType Directory -Path $versionRoot -Force | Out-Null
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $versionRoot -Force
+
+        if (-not (Test-Path -LiteralPath $gradleBat -PathType Leaf)) {
+            throw "Gradle archive install did not produce '$gradleBat'."
+        }
+
+        [void](Set-UserEnvironmentValue -Name "GRADLE_HOME" -Value $gradleHome)
+        [void](Ensure-UserPathEntry -Entry (Join-Path $gradleHome "bin"))
+        return $true
+    }
+    catch {
+        Write-Warning "Gradle archive install failed: $($_.Exception.Message)"
+        return $false
+    }
+    finally {
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Get-ManagerOrder {
@@ -701,6 +1052,12 @@ if ($catalog.ContainsKey("python")) {
     $catalog["python"].winget = $pythonOverride.winget
     $catalog["python"].choco = $pythonOverride.choco
 }
+$javaOverride = Get-JavaCatalogEntryOverride -TargetVersion $JavaVersion
+if ($catalog.ContainsKey("java")) {
+    $catalog["java"].winget = $javaOverride.winget
+    $catalog["java"].choco = $javaOverride.choco
+}
+$catalog["jdk"] = $catalog["java"]
 $toolsToEnsure = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
 foreach ($tool in (Get-ManifestToolSet -TemplateName $Template -ToolPhase $Phase)) {
@@ -773,7 +1130,7 @@ foreach ($toolName in ($toolsToEnsure | Sort-Object)) {
     }
 
     $definition = $catalog[$toolName]
-    $available = Get-ToolStatus -Definition $definition
+    $available = Get-ToolStatus -Definition $definition -ToolName $toolName
 
     if ([bool]$definition.builtin) {
         $rows.Add([pscustomobject]@{
@@ -805,32 +1162,95 @@ foreach ($toolName in ($toolsToEnsure | Sort-Object)) {
     $success = $false
     $managerUsed = "-"
     $failureReasons = @()
+    $archiveAttempted = $false
+
+    if ($toolName -eq "gradle" -and [string]::IsNullOrWhiteSpace($GradleVersion)) {
+        $archiveAttempted = $true
+        $managerUsed = "archive"
+        $success = Invoke-GradleArchiveInstall -Action $desiredAction -Version $null
+        if ($success) {
+            if ($RefreshEnvironment -and -not $DryRun) {
+                Invoke-ProcessEnvironmentRefresh
+            }
+
+            if (-not (Get-ToolStatus -Definition $definition -ToolName $toolName)) {
+                $success = $false
+                $failureReasons += "archive install completed but 'gradle' is still unavailable"
+            } else {
+                $anyChanges = $true
+            }
+        } else {
+            $failureReasons += "archive install failed"
+            $managerUsed = "-"
+        }
+    }
+
+    if ($success) {
+        $rows.Add([pscustomobject]@{
+                Tool    = $toolName
+                State   = if ($available) { "present" } else { "missing" }
+                Action  = $desiredAction
+                Manager = $managerUsed
+                Result  = "ok"
+            })
+        continue
+    }
 
     foreach ($manager in $managerOrder) {
+        $commandSucceeded = $false
         if ($manager -eq "winget") {
             $id = $definition.winget
             if ([string]::IsNullOrWhiteSpace($id)) {
                 $failureReasons += "winget id missing"
                 continue
             }
-            $managerUsed = "winget"
-            $success = Invoke-WingetAction -Action $desiredAction -PackageId $id
+            $commandSucceeded = Invoke-WingetAction -Action $desiredAction -PackageId $id
         } elseif ($manager -eq "choco") {
             $id = $definition.choco
             if ([string]::IsNullOrWhiteSpace($id)) {
                 $failureReasons += "choco id missing"
                 continue
             }
-            $managerUsed = "choco"
-            $success = Invoke-ChocoAction -Action $desiredAction -PackageId $id
+            $commandSucceeded = Invoke-ChocoAction -Action $desiredAction -PackageId $id
         }
 
+        if (-not $commandSucceeded) {
+            $failureReasons += "$manager command failed"
+            continue
+        }
+
+        if ($RefreshEnvironment -and -not $DryRun) {
+            Invoke-ProcessEnvironmentRefresh
+        }
+
+        if (-not (Get-ToolStatus -Definition $definition -ToolName $toolName)) {
+            $failureReasons += "$manager completed but '$toolName' is still unavailable"
+            continue
+        }
+
+        $managerUsed = $manager
+        $success = $true
+        $anyChanges = $true
+        break
+    }
+
+    if (-not $success -and $toolName -eq "gradle" -and -not $archiveAttempted) {
+        $managerUsed = "archive"
+        $success = Invoke-GradleArchiveInstall -Action $desiredAction -Version $GradleVersion
         if ($success) {
-            $anyChanges = $true
-            break
-        }
+            if ($RefreshEnvironment -and -not $DryRun) {
+                Invoke-ProcessEnvironmentRefresh
+            }
 
-        $failureReasons += "$manager command failed"
+            if (-not (Get-ToolStatus -Definition $definition -ToolName $toolName)) {
+                $success = $false
+                $failureReasons += "archive install completed but 'gradle' is still unavailable"
+            } else {
+                $anyChanges = $true
+            }
+        } else {
+            $failureReasons += "archive install failed"
+        }
     }
 
     if ($success) {

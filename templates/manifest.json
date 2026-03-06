@@ -222,9 +222,11 @@
       "python_module_template": false,
       "required_tools": {
         "install": [
+          "java",
           "gradle"
         ],
         "check": [
+          "java",
           "gradle"
         ]
       },
@@ -247,9 +249,11 @@
       "python_module_template": false,
       "required_tools": {
         "install": [
+          "java",
           "gradle"
         ],
         "check": [
+          "java",
           "gradle"
         ]
       },

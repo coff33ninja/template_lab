@@ -79,7 +79,9 @@ Method reference:
 - `-InstallMissing:$true -UpgradeExisting:$false`: install-only mode (no upgrades).
 - `-Template <name> -Phase install`: scope to one template's install requirements.
 - `-Tools <list>`: override manifest resolution and target only the listed tools.
-- `-Tools python -PythonVersion <x.y>`: force Python package selection by version.
+- `-Tools python -PythonVersion <x.y>`: optionally force a Python version; latest is used when omitted.
+- `-Tools java -JavaVersion <major>`: optionally force a JDK major version; latest is used when omitted.
+- `-Tools gradle -GradleVersion <x.y.z>`: optionally force a Gradle version; latest is used when omitted.
 - `-OpenNewShell`: refresh env and start a new shell so PATH changes are active.
 - `-UpdatePackageManagers -PackageManagersOnly`: manager maintenance without tool installs.
 - `-AllowBootstrapScript`: enables Chocolatey community bootstrap script fallback.
@@ -95,10 +97,16 @@ pwsh -File .\scripts\setup-toolchain.ps1 -Phase all -InstallMissing:$true -Upgra
 pwsh -File .\scripts\setup-toolchain.ps1 -Template flutter-app -Phase install
 
 # Explicit tool list
-pwsh -File .\scripts\setup-toolchain.ps1 -Tools git,python,npm,go,flutter,gradle,uv,gh,pwsh
+pwsh -File .\scripts\setup-toolchain.ps1 -Tools git,python,npm,go,java,flutter,gradle,uv,gh,pwsh
+
+# Resolve latest versions automatically when not pinned
+pwsh -File .\scripts\setup-toolchain.ps1 -Tools python,java,gradle -InstallMissing:$true -UpgradeExisting:$false
 
 # Pin Python target version (winget/choco package selection)
 pwsh -File .\scripts\setup-toolchain.ps1 -Tools python -PythonVersion 3.13 -InstallMissing:$true -UpgradeExisting:$true
+
+# Pin Java + Gradle explicitly when you need reproducibility or compatibility control
+pwsh -File .\scripts\setup-toolchain.ps1 -Tools java,gradle -JavaVersion 17 -GradleVersion 8.10.2 -InstallMissing:$true -UpgradeExisting:$false
 
 # Refresh env and open a fresh shell that reruns preflight
 pwsh -File .\scripts\setup-toolchain.ps1 -Phase all -OpenNewShell
@@ -113,8 +121,12 @@ pwsh -File .\scripts\setup-toolchain.ps1 -UpdatePackageManagers -PackageManagers
 Behavior notes:
 
 - Uses `winget` first where package IDs are known and valid, then falls back to `choco`.
-- Some tools (notably `flutter`, `gradle`) are installed via `choco` by default because winget IDs are inconsistent across environments.
-- Python version is user-selectable via `-PythonVersion` (for example `3.11`, `3.12`, `3.13`).
+- Some tools (notably `flutter`) are installed via `choco` by default because winget IDs are inconsistent across environments.
+- Python version is user-selectable via `-PythonVersion`; if omitted the script resolves the latest available Python 3 package at runtime.
+- Java version is user-selectable via `-JavaVersion`; if omitted the script resolves the latest available Temurin JDK at runtime.
+- Gradle version is user-selectable via `-GradleVersion`; if omitted the script resolves the current Gradle release at runtime.
+- Latest-version defaults optimize for convenience; pass explicit versions when you need deterministic or compatibility-sensitive installs.
+- If package managers fail to produce a usable `gradle` command, the script falls back to the official Gradle distribution ZIP in `%LOCALAPPDATA%\template-lab\tools\gradle`.
 - Winget maintenance methods: `winget source update` -> `winget upgrade Microsoft.AppInstaller` -> `winget install Microsoft.AppInstaller` -> `choco upgrade/install winget` -> `https://aka.ms/getwinget` MSIX bootstrap.
 - Chocolatey maintenance methods: `choco upgrade chocolatey` -> `choco install chocolatey` -> `winget upgrade/install Chocolatey.Chocolatey` -> optional community bootstrap script (`-AllowBootstrapScript`).
 - Refreshes the current process environment (`PATH` and other Machine/User vars) after installs.
@@ -219,6 +231,14 @@ pwsh -File .\scripts\new-project.ps1 -Template go-cli-tool -Name go-cli -InitGit
 
 `scripts/bootstrap.ps1` now supports pinned tags and SHA256 verification.
 
+Scope note:
+
+- `bootstrap.ps1` is the only script designed for direct `irm` use.
+- `preflight.ps1` and `setup-toolchain.ps1` are repo-bound scripts; they read `templates/manifest.json` and expect the checked-out repository layout to exist on disk.
+- That means a raw `irm` of those scripts alone is not equivalent to `bootstrap.ps1` and is not the recommended path.
+- If you want the same remote-entry experience for those tools, use `bootstrap-repo-script.ps1`, which first downloads/extracts the repo and then invokes the target script locally.
+- If you want reproducible tool installs from a remote wrapper, pin both the repo ref and any tool versions you care about; when version flags are omitted, `setup-toolchain.ps1` now resolves latest available versions at execution time.
+
 Method reference:
 
 - `irm` inline: fastest one-liner, no local clone required.
@@ -302,6 +322,73 @@ pwsh -File .\scripts\bootstrap.ps1 `
   -RefType branch `
   -AllowMutableRef `
   -AllowUnverified
+```
+
+## Secure IRM repo scripts
+
+`scripts/bootstrap-repo-script.ps1` gives `preflight.ps1` and `setup-toolchain.ps1` the same remote-entry model as `bootstrap.ps1`: download repo archive, verify it, extract it, then run the target script locally from that extracted repo.
+
+Method reference:
+
+- `-Script preflight|setup-toolchain`: choose the repo-bound script to run.
+- Shares the same archive trust model as `bootstrap.ps1`: tag + checksum preferred, mutable branch only with `-AllowMutableRef`, unverified only with `-AllowUnverified`.
+- Use a release tag that already includes `bootstrap-repo-script.ps1` and the target script, or use `main` with the explicit mutable/unverified flags until a release includes them.
+- Use explicit tool version flags when you want deterministic installs; otherwise `setup-toolchain.ps1` resolves latest available versions at execution time.
+- `-Script setup-toolchain -OpenNewShell` requires `-KeepDownloadedFiles` so the extracted repo still exists for the new shell.
+
+Preferred `preflight` flow:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap-repo-script.ps1"))) `
+  -Script preflight `
+  -Phase all `
+  -Ref vX.Y.Z `
+  -RefType tag
+```
+
+Preferred `setup-toolchain` flow:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap-repo-script.ps1"))) `
+  -Script setup-toolchain `
+  -Phase all `
+  -InstallMissing:$true `
+  -UpgradeExisting:$false `
+  -Ref vX.Y.Z `
+  -RefType tag
+```
+
+Pinned toolchain example:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap-repo-script.ps1"))) `
+  -Script setup-toolchain `
+  -Tools java,gradle `
+  -JavaVersion 17 `
+  -GradleVersion 8.10.2 `
+  -InstallMissing:$true `
+  -UpgradeExisting:$false `
+  -Ref vX.Y.Z `
+  -RefType tag
+```
+
+Mutable branch fallback:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/coff33ninja/template_lab/main/scripts/bootstrap-repo-script.ps1"))) `
+  -Script preflight `
+  -Phase all `
+  -Ref main `
+  -RefType branch `
+  -AllowMutableRef `
+  -AllowUnverified
+```
+
+Non-IRM equivalents:
+
+```powershell
+pwsh -File .\scripts\bootstrap-repo-script.ps1 -Script preflight -Phase all -Ref vX.Y.Z -RefType tag
+pwsh -File .\scripts\bootstrap-repo-script.ps1 -Script setup-toolchain -Phase all -InstallMissing:$true -UpgradeExisting:$false -Ref vX.Y.Z -RefType tag
 ```
 
 ## CI and release automation

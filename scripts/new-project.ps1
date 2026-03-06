@@ -200,6 +200,36 @@ function Get-TemplateConfig {
     return $templates[$TemplateName]
 }
 
+function Get-GradleCommandPath {
+    param(
+        [string]$ProjectPath
+    )
+
+    $wrapperPath = if ([string]::IsNullOrWhiteSpace($ProjectPath)) { $null } else { Join-Path $ProjectPath "gradlew.bat" }
+    if (-not [string]::IsNullOrWhiteSpace($wrapperPath) -and (Test-Path -LiteralPath $wrapperPath -PathType Leaf)) {
+        return $wrapperPath
+    }
+
+    $command = Get-Command "gradle" -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    foreach ($scope in @("Process", "User", "Machine")) {
+        $gradleHome = [Environment]::GetEnvironmentVariable("GRADLE_HOME", $scope)
+        if ([string]::IsNullOrWhiteSpace($gradleHome)) {
+            continue
+        }
+
+        $gradleBat = Join-Path $gradleHome "bin\gradle.bat"
+        if (Test-Path -LiteralPath $gradleBat -PathType Leaf) {
+            return $gradleBat
+        }
+    }
+
+    return $null
+}
+
 function Test-ToolAvailable {
     param(
         [Parameter(Mandatory = $true)][string]$Tool,
@@ -210,9 +240,11 @@ function Test-ToolAvailable {
         "python" {
             return [bool](Get-Command "python" -ErrorAction SilentlyContinue) -or [bool](Get-Command "py" -ErrorAction SilentlyContinue)
         }
+        "java" {
+            return [bool](Get-Command "java" -ErrorAction SilentlyContinue)
+        }
         "gradle" {
-            $wrapperPath = if ([string]::IsNullOrWhiteSpace($ProjectPath)) { $null } else { Join-Path $ProjectPath "gradlew.bat" }
-            return (Test-Path -LiteralPath $wrapperPath -PathType Leaf) -or [bool](Get-Command "gradle" -ErrorAction SilentlyContinue)
+            return [bool](Get-GradleCommandPath -ProjectPath $ProjectPath)
         }
         default {
             return [bool](Get-Command $Tool -ErrorAction SilentlyContinue)
@@ -673,12 +705,11 @@ function Install-TemplateDependenciesByStrategy {
 
             Push-Location $projectFullPath
             try {
-                $gradleWrapper = Join-Path $projectFullPath "gradlew.bat"
-                if (Test-Path -LiteralPath $gradleWrapper -PathType Leaf) {
-                    Invoke-ExternalCommand -Command $gradleWrapper -Arguments @("dependencies") -FailureMessage "gradlew dependencies failed."
-                } else {
-                    Invoke-ExternalCommand -Command "gradle" -Arguments @("dependencies") -FailureMessage "gradle dependencies failed."
+                $gradleCommand = Get-GradleCommandPath -ProjectPath $projectFullPath
+                if ([string]::IsNullOrWhiteSpace($gradleCommand)) {
+                    throw "Gradle command could not be resolved for '$TemplateName'."
                 }
+                Invoke-ExternalCommand -Command $gradleCommand -Arguments @("dependencies") -FailureMessage "Gradle dependencies failed."
             }
             finally {
                 Pop-Location
@@ -832,12 +863,11 @@ function Invoke-TemplateChecksByStrategy {
         "gradle_test" {
             Push-Location $projectFullPath
             try {
-                $gradleWrapper = Join-Path $projectFullPath "gradlew.bat"
-                if (Test-Path -LiteralPath $gradleWrapper -PathType Leaf) {
-                    Invoke-ExternalCommand -Command $gradleWrapper -Arguments @("test") -FailureMessage "Gradle tests failed."
-                } else {
-                    Invoke-ExternalCommand -Command "gradle" -Arguments @("test") -FailureMessage "Gradle tests failed."
+                $gradleCommand = Get-GradleCommandPath -ProjectPath $projectFullPath
+                if ([string]::IsNullOrWhiteSpace($gradleCommand)) {
+                    throw "Gradle command could not be resolved for '$TemplateName'."
                 }
+                Invoke-ExternalCommand -Command $gradleCommand -Arguments @("test") -FailureMessage "Gradle tests failed."
             }
             finally {
                 Pop-Location
@@ -848,12 +878,11 @@ function Invoke-TemplateChecksByStrategy {
         "gradle_help" {
             Push-Location $projectFullPath
             try {
-                $gradleWrapper = Join-Path $projectFullPath "gradlew.bat"
-                if (Test-Path -LiteralPath $gradleWrapper -PathType Leaf) {
-                    Invoke-ExternalCommand -Command $gradleWrapper -Arguments @("help") -FailureMessage "Gradle help failed."
-                } else {
-                    Invoke-ExternalCommand -Command "gradle" -Arguments @("help") -FailureMessage "Gradle help failed."
+                $gradleCommand = Get-GradleCommandPath -ProjectPath $projectFullPath
+                if ([string]::IsNullOrWhiteSpace($gradleCommand)) {
+                    throw "Gradle command could not be resolved for '$TemplateName'."
                 }
+                Invoke-ExternalCommand -Command $gradleCommand -Arguments @("help") -FailureMessage "Gradle help failed."
             }
             finally {
                 Pop-Location

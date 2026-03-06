@@ -102,6 +102,6 @@ Top-level organizer for many experiment types in one repo.
 ## Known lightweight gaps
 
 - `flutter-full-app` materializes platform folders during `-InstallDeps`; the raw template stays lightweight.
-- Kotlin templates do not ship Gradle wrapper binaries; they use local `gradle` if wrapper is absent.
+- Kotlin templates do not ship Gradle wrapper binaries; they rely on Java plus a Gradle install from `scripts/setup-toolchain.ps1`, and you can pin versions explicitly when compatibility matters.
 - Node/web templates do not enforce lint/format by default.
 - `mad-lab` is intentionally unopinionated and does not impose runtime tooling.
