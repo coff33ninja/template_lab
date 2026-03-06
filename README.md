@@ -4,11 +4,19 @@ Reusable project skeletons for rapid experiments.
 
 ## Included templates
 
+- `cmd-batch-tool`
 - `python-tool`
+- `python-fastapi-service`
 - `node-api`
+- `typescript-node-api`
 - `go-service`
+- `go-cli-tool`
 - `flutter-app`
+- `flutter-full-app`
 - `kotlin-android`
+- `kotlin-jvm-cli`
+- `fullstack-monorepo`
+- `dockerized-service`
 - `powershell-tool`
 - `web-static`
 - `mad-lab`
@@ -24,6 +32,10 @@ pwsh -File .\scripts\new-project.ps1 -Template node-api -Name api-lab -Destinati
 pwsh -File .\scripts\new-project.ps1 -Template python-tool -Name py-lab -Destination C:\scipts\projects -InstallDeps -PythonEnvManager uv -PythonVersion 3.12 -PythonVenvName .venv312 -AdditionalPackages "httpx==0.28.1" "rich==14.0.0" -InitGit
 pwsh -File .\scripts\new-project.ps1 -Template node-api -Name node-lab -Destination C:\scipts\projects -InstallDeps -AdditionalPackages "zod@3.25.0" "dotenv@17.2.3" -InitGit
 pwsh -File .\scripts\new-project.ps1 -Template go-service -Name go-lab -Destination C:\scipts\projects -InstallDeps -RunChecks -InitGit
+pwsh -File .\scripts\new-project.ps1 -Template typescript-node-api -Name ts-api -Destination C:\scipts\projects -InstallDeps -RunChecks -InitGit
+pwsh -File .\scripts\new-project.ps1 -Template python-fastapi-service -Name fast-api -Destination C:\scipts\projects -InstallDeps -RunChecks -InitGit
+pwsh -File .\scripts\new-project.ps1 -Template cmd-batch-tool -Name win-tool -Destination C:\scipts\projects -RunChecks -InitGit
+pwsh -File .\scripts\new-project.ps1 -Template fullstack-monorepo -Name stack-lab -Destination C:\scipts\projects -InstallDeps -RunChecks -InitGit
 ```
 
 ## No Clone Bootstrap (IRM)
@@ -91,24 +103,40 @@ Useful flags on `new-project.ps1`:
 
 `-InstallDeps` behavior by template:
 
+- `cmd-batch-tool`: no dependency step (skipped)
 - `python-tool`: `uv venv` + `uv pip install -e .[dev]` when `uv` exists; otherwise `python/py -m venv` + pip install
+- `python-fastapi-service`: same as `python-tool`
+- `dockerized-service`: Python venv + install from `requirements.txt` and `requirements-dev.txt`
 - `python-tool` extra packages: `-AdditionalPackages "requests==2.32.3" "rich==14.0.0"`
 - `node-api`: `npm install`
+- `typescript-node-api`: `npm install`
+- `fullstack-monorepo`: `npm install` from monorepo root
 - `node-api` extra packages: `-AdditionalPackages "zod@3.25.0" "dotenv@17.2.3"`
 - `go-service`: `go mod tidy`
+- `go-cli-tool`: `go mod tidy`
 - `go-service` extra modules: `-AdditionalPackages "github.com/go-chi/chi/v5@v5.2.3"`
 - `flutter-app`: `flutter pub get`
+- `flutter-full-app`: `flutter create ...` (if platforms are missing) + `flutter pub get`
 - `flutter-app` extra packages: `-AdditionalPackages "dio:^5.8.0"`
-- `kotlin-android`: runs `gradlew.bat dependencies` only if wrapper exists in project
+- `kotlin-android`: runs `gradlew.bat dependencies`; falls back to `gradle dependencies` if wrapper is missing
+- `kotlin-jvm-cli`: same Gradle dependency behavior as Kotlin Android
 - `powershell-tool`, `web-static`, `mad-lab`: no dependency step (skipped)
 
 `-RunChecks` behavior by template:
 
+- `cmd-batch-tool`: run `cmd /c tool.cmd --check`
 - `python-tool`: run `pytest -q` (prefers selected venv if present)
+- `python-fastapi-service`: run `pytest -q`
+- `dockerized-service`: run `pytest -q` and `docker compose config -q` (if Docker is installed)
 - `node-api`: run `npm test`
+- `typescript-node-api`: run `npm run build` then `npm test`
+- `fullstack-monorepo`: run `npm run test -ws --if-present`
 - `go-service`: run `go test ./...`
+- `go-cli-tool`: run `go test ./...` then `go build ./cmd/app`
 - `flutter-app`: run `flutter test`
-- `kotlin-android`: run `gradlew.bat test` only if wrapper exists
+- `flutter-full-app`: run `flutter test`
+- `kotlin-android`: run `gradlew.bat test`; falls back to `gradle test` if wrapper is missing
+- `kotlin-jvm-cli`: same Gradle test behavior
 - `powershell-tool`, `web-static`, `mad-lab`: no checks defined (skipped)
 
 `-DependencySpecFile` example (`deps.json`):
@@ -116,8 +144,12 @@ Useful flags on `new-project.ps1`:
 ```json
 {
   "python-tool": ["httpx==0.28.1", "rich==14.0.0"],
+  "python-fastapi-service": ["orjson==3.10.12"],
   "node-api": ["zod@3.25.0"],
+  "typescript-node-api": ["zod@3.25.0"],
   "go-service": ["github.com/go-chi/chi/v5@v5.2.3"],
+  "go-cli-tool": ["github.com/spf13/cobra@v1.8.1"],
+  "fullstack-monorepo": ["zod@3.25.0"],
   "flutter-app": ["dio:^5.8.0"]
 }
 ```

@@ -2,11 +2,19 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet(
+        "cmd-batch-tool",
         "python-tool",
+        "python-fastapi-service",
         "node-api",
+        "typescript-node-api",
         "go-service",
+        "go-cli-tool",
         "flutter-app",
+        "flutter-full-app",
         "kotlin-android",
+        "kotlin-jvm-cli",
+        "fullstack-monorepo",
+        "dockerized-service",
         "powershell-tool",
         "web-static",
         "mad-lab"

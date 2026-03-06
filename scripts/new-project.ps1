@@ -2,11 +2,19 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet(
+        "cmd-batch-tool",
         "python-tool",
+        "python-fastapi-service",
         "node-api",
+        "typescript-node-api",
         "go-service",
+        "go-cli-tool",
         "flutter-app",
+        "flutter-full-app",
         "kotlin-android",
+        "kotlin-jvm-cli",
+        "fullstack-monorepo",
+        "dockerized-service",
         "powershell-tool",
         "web-static",
         "mad-lab"
@@ -53,11 +61,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Require-Command {
+function Get-RequiredCommand {
     param([Parameter(Mandatory = $true)][string]$Name)
-    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if (-not $command) {
         throw "Required command not found: $Name"
     }
+    return $command
 }
 
 function Invoke-CommandChecked {
@@ -73,7 +83,7 @@ function Invoke-CommandChecked {
     }
 }
 
-function Install-TemplateDependencies {
+function Install-TemplateDependency {
     param(
         [Parameter(Mandatory = $true)][string]$TemplateName,
         [Parameter(Mandatory = $true)][string]$ProjectPath,
@@ -86,7 +96,7 @@ function Install-TemplateDependencies {
     $projectFullPath = (Resolve-Path -LiteralPath $ProjectPath).Path
 
     switch ($TemplateName) {
-        "python-tool" {
+        { $_ -in @("python-tool", "python-fastapi-service") } {
             Push-Location $projectFullPath
             try {
                 $uvAvailable = Get-Command "uv" -ErrorAction SilentlyContinue
@@ -157,8 +167,79 @@ function Install-TemplateDependencies {
                 Pop-Location
             }
         }
-        "node-api" {
-            Require-Command -Name "npm"
+        "dockerized-service" {
+            Push-Location $projectFullPath
+            try {
+                $uvAvailable = Get-Command "uv" -ErrorAction SilentlyContinue
+                $useUv = $false
+                switch ($PythonManager) {
+                    "uv" {
+                        if (-not $uvAvailable) {
+                            throw "PythonEnvManager is 'uv' but 'uv' command is not available."
+                        }
+                        $useUv = $true
+                    }
+                    "venv" {
+                        $useUv = $false
+                    }
+                    default {
+                        $useUv = [bool]$uvAvailable
+                    }
+                }
+
+                if ($useUv) {
+                    Write-Output "Installing Python deps with uv..."
+                    $uvVenvArgs = @("venv", $PythonVenv)
+                    if (-not [string]::IsNullOrWhiteSpace($PythonTargetVersion)) {
+                        $uvVenvArgs += @("--python", $PythonTargetVersion)
+                    }
+                    Invoke-CommandChecked -Command "uv" -Arguments $uvVenvArgs -FailureMessage "uv venv failed."
+                    $uvPython = Join-Path $projectFullPath ($PythonVenv + "\Scripts\python.exe")
+                    if (-not (Test-Path -Path $uvPython -PathType Leaf)) {
+                        throw "Virtual environment python not found at $uvPython"
+                    }
+
+                    Invoke-CommandChecked -Command "uv" -Arguments @("pip", "install", "--python", $uvPython, "-r", "requirements.txt", "-r", "requirements-dev.txt") -FailureMessage "uv pip install requirements failed."
+                    if ($UserPackages.Count -gt 0) {
+                        Write-Output "Installing extra Python packages..."
+                        Invoke-CommandChecked -Command "uv" -Arguments (@("pip", "install", "--python", $uvPython) + $UserPackages) -FailureMessage "uv pip install extra packages failed."
+                    }
+                    return
+                }
+
+                $pythonAvailable = Get-Command "python" -ErrorAction SilentlyContinue
+                $pyAvailable = Get-Command "py" -ErrorAction SilentlyContinue
+                if (-not $pythonAvailable -and -not $pyAvailable) {
+                    throw "Neither 'uv', 'python', nor 'py' is available for Python dependency install."
+                }
+
+                Write-Output "Installing Python deps with venv + pip..."
+                if (-not [string]::IsNullOrWhiteSpace($PythonTargetVersion) -and $pyAvailable) {
+                    Invoke-CommandChecked -Command "py" -Arguments @("-$PythonTargetVersion", "-m", "venv", $PythonVenv) -FailureMessage "py -$PythonTargetVersion -m venv failed."
+                } elseif ($pythonAvailable) {
+                    Invoke-CommandChecked -Command "python" -Arguments @("-m", "venv", $PythonVenv) -FailureMessage "python -m venv failed."
+                } else {
+                    Invoke-CommandChecked -Command "py" -Arguments @("-3", "-m", "venv", $PythonVenv) -FailureMessage "py -3 -m venv failed."
+                }
+
+                $venvPython = Join-Path $projectFullPath ($PythonVenv + "\Scripts\python.exe")
+                if (-not (Test-Path -Path $venvPython -PathType Leaf)) {
+                    throw "Virtual environment python not found at $venvPython"
+                }
+
+                Invoke-CommandChecked -Command $venvPython -Arguments @("-m", "pip", "install", "--upgrade", "pip") -FailureMessage "pip upgrade failed."
+                Invoke-CommandChecked -Command $venvPython -Arguments @("-m", "pip", "install", "-r", "requirements.txt", "-r", "requirements-dev.txt") -FailureMessage "pip install requirements failed."
+                if ($UserPackages.Count -gt 0) {
+                    Write-Output "Installing extra Python packages..."
+                    Invoke-CommandChecked -Command $venvPython -Arguments (@("-m", "pip", "install") + $UserPackages) -FailureMessage "pip install extra packages failed."
+                }
+            }
+            finally {
+                Pop-Location
+            }
+        }
+        { $_ -in @("node-api", "typescript-node-api", "fullstack-monorepo") } {
+            [void](Get-RequiredCommand -Name "npm")
             Push-Location $projectFullPath
             try {
                 Write-Output "Installing Node deps with npm..."
@@ -172,8 +253,8 @@ function Install-TemplateDependencies {
                 Pop-Location
             }
         }
-        "go-service" {
-            Require-Command -Name "go"
+        { $_ -in @("go-service", "go-cli-tool") } {
+            [void](Get-RequiredCommand -Name "go")
             Push-Location $projectFullPath
             try {
                 Write-Output "Resolving Go modules..."
@@ -189,10 +270,26 @@ function Install-TemplateDependencies {
                 Pop-Location
             }
         }
-        "flutter-app" {
-            Require-Command -Name "flutter"
+        { $_ -in @("flutter-app", "flutter-full-app") } {
+            [void](Get-RequiredCommand -Name "flutter")
             Push-Location $projectFullPath
             try {
+                if ($TemplateName -eq "flutter-full-app") {
+                    $projectName = "app"
+                    $pubspecPath = Join-Path $projectFullPath "pubspec.yaml"
+                    if (Test-Path -Path $pubspecPath -PathType Leaf) {
+                        $namePattern = '^name:\s*["'']?([a-z0-9_]+)["'']?'
+                        $nameLine = Get-Content -Path $pubspecPath | Where-Object { $_ -match $namePattern } | Select-Object -First 1
+                        if ($nameLine -and $nameLine -match $namePattern) {
+                            $projectName = $Matches[1]
+                        }
+                    }
+                    $androidBuild = Join-Path $projectFullPath "android\app\build.gradle"
+                    if (-not (Test-Path -Path $androidBuild -PathType Leaf)) {
+                        Write-Output "Materializing full Flutter platform folders..."
+                        Invoke-CommandChecked -Command "flutter" -Arguments @("create", "--project-name", $projectName, "--platforms=android,ios,web,windows,linux,macos", ".") -FailureMessage "flutter create failed for flutter-full-app."
+                    }
+                }
                 Write-Output "Fetching Flutter packages..."
                 Invoke-CommandChecked -Command "flutter" -Arguments @("pub", "get") -FailureMessage "flutter pub get failed."
                 foreach ($flutterSpec in $UserPackages) {
@@ -203,23 +300,41 @@ function Install-TemplateDependencies {
                 Pop-Location
             }
         }
-        "kotlin-android" {
+        { $_ -in @("kotlin-android", "kotlin-jvm-cli") } {
             if ($UserPackages.Count -gt 0) {
-                throw "Additional package install is not yet automated for kotlin-android template."
+                throw "Additional package install is not yet automated for Kotlin templates."
             }
             $gradleWrapper = Join-Path $projectFullPath "gradlew.bat"
             if (Test-Path -Path $gradleWrapper -PathType Leaf) {
                 Push-Location $projectFullPath
                 try {
-                    Write-Output "Resolving Android dependencies..."
+                    Write-Output "Resolving Kotlin dependencies..."
                     Invoke-CommandChecked -Command $gradleWrapper -Arguments @("dependencies") -FailureMessage "gradlew dependencies failed."
                 }
                 finally {
                     Pop-Location
                 }
             } else {
-                Write-Warning "Skipping dependency install for kotlin-android: no gradlew.bat in template."
+                $gradleCmd = Get-Command "gradle" -ErrorAction SilentlyContinue
+                if ($gradleCmd) {
+                    Push-Location $projectFullPath
+                    try {
+                        Write-Output "Resolving Kotlin/Gradle dependencies..."
+                        Invoke-CommandChecked -Command "gradle" -Arguments @("dependencies") -FailureMessage "gradle dependencies failed."
+                    }
+                    finally {
+                        Pop-Location
+                    }
+                } else {
+                    Write-Warning "Skipping dependency install for ${TemplateName}: no gradlew.bat or gradle command found."
+                }
             }
+        }
+        "cmd-batch-tool" {
+            if ($UserPackages.Count -gt 0) {
+                throw "Additional package install is not defined for cmd-batch-tool."
+            }
+            Write-Output "No dependency install step defined for template '$TemplateName'."
         }
         default {
             if ($UserPackages.Count -gt 0) {
@@ -230,7 +345,7 @@ function Install-TemplateDependencies {
     }
 }
 
-function Run-TemplateChecks {
+function Invoke-TemplateCheck {
     param(
         [Parameter(Mandatory = $true)][string]$TemplateName,
         [Parameter(Mandatory = $true)][string]$ProjectPath,
@@ -241,7 +356,7 @@ function Run-TemplateChecks {
     $projectFullPath = (Resolve-Path -LiteralPath $ProjectPath).Path
 
     switch ($TemplateName) {
-        "python-tool" {
+        { $_ -in @("python-tool", "python-fastapi-service") } {
             Push-Location $projectFullPath
             try {
                 $venvPython = Join-Path $projectFullPath ($PythonVenv + "\Scripts\python.exe")
@@ -271,30 +386,42 @@ function Run-TemplateChecks {
                 Pop-Location
             }
         }
-        "node-api" {
-            Require-Command -Name "npm"
+        { $_ -in @("node-api", "typescript-node-api", "fullstack-monorepo") } {
+            [void](Get-RequiredCommand -Name "npm")
             Push-Location $projectFullPath
             try {
-                Write-Output "Running Node checks..."
-                Invoke-CommandChecked -Command "npm" -Arguments @("test") -FailureMessage "Node tests failed."
+                if ($TemplateName -eq "typescript-node-api") {
+                    Write-Output "Running TypeScript Node checks..."
+                    Invoke-CommandChecked -Command "npm" -Arguments @("run", "build") -FailureMessage "TypeScript build failed."
+                    Invoke-CommandChecked -Command "npm" -Arguments @("test") -FailureMessage "TypeScript tests failed."
+                } elseif ($TemplateName -eq "fullstack-monorepo") {
+                    Write-Output "Running monorepo checks..."
+                    Invoke-CommandChecked -Command "npm" -Arguments @("run", "test", "-ws", "--if-present") -FailureMessage "Monorepo tests failed."
+                } else {
+                    Write-Output "Running Node checks..."
+                    Invoke-CommandChecked -Command "npm" -Arguments @("test") -FailureMessage "Node tests failed."
+                }
             }
             finally {
                 Pop-Location
             }
         }
-        "go-service" {
-            Require-Command -Name "go"
+        { $_ -in @("go-service", "go-cli-tool") } {
+            [void](Get-RequiredCommand -Name "go")
             Push-Location $projectFullPath
             try {
                 Write-Output "Running Go checks..."
                 Invoke-CommandChecked -Command "go" -Arguments @("test", "./...") -FailureMessage "Go tests failed."
+                if ($TemplateName -eq "go-cli-tool") {
+                    Invoke-CommandChecked -Command "go" -Arguments @("build", "./cmd/app") -FailureMessage "Go CLI build failed."
+                }
             }
             finally {
                 Pop-Location
             }
         }
-        "flutter-app" {
-            Require-Command -Name "flutter"
+        { $_ -in @("flutter-app", "flutter-full-app") } {
+            [void](Get-RequiredCommand -Name "flutter")
             Push-Location $projectFullPath
             try {
                 Write-Output "Running Flutter checks..."
@@ -304,19 +431,78 @@ function Run-TemplateChecks {
                 Pop-Location
             }
         }
-        "kotlin-android" {
+        { $_ -in @("kotlin-android", "kotlin-jvm-cli") } {
             $gradleWrapper = Join-Path $projectFullPath "gradlew.bat"
             if (Test-Path -Path $gradleWrapper -PathType Leaf) {
                 Push-Location $projectFullPath
                 try {
-                    Write-Output "Running Kotlin/Android checks..."
+                    Write-Output "Running Kotlin checks..."
                     Invoke-CommandChecked -Command $gradleWrapper -Arguments @("test") -FailureMessage "Gradle tests failed."
                 }
                 finally {
                     Pop-Location
                 }
             } else {
-                Write-Warning "Skipping checks for kotlin-android: no gradlew.bat in template."
+                $gradleCmd = Get-Command "gradle" -ErrorAction SilentlyContinue
+                if ($gradleCmd) {
+                    Push-Location $projectFullPath
+                    try {
+                        Write-Output "Running Kotlin checks via gradle command..."
+                        Invoke-CommandChecked -Command "gradle" -Arguments @("test") -FailureMessage "Gradle tests failed."
+                    }
+                    finally {
+                        Pop-Location
+                    }
+                } else {
+                    Write-Warning "Skipping checks for ${TemplateName}: no gradlew.bat or gradle command found."
+                }
+            }
+        }
+        "cmd-batch-tool" {
+            Push-Location $projectFullPath
+            try {
+                Write-Output "Running CMD batch smoke check..."
+                Invoke-CommandChecked -Command "cmd" -Arguments @("/c", "tool.cmd", "--check") -FailureMessage "cmd-batch-tool check failed."
+            }
+            finally {
+                Pop-Location
+            }
+        }
+        "dockerized-service" {
+            Push-Location $projectFullPath
+            try {
+                $venvPython = Join-Path $projectFullPath ($PythonVenv + "\Scripts\python.exe")
+                if (Test-Path -Path $venvPython -PathType Leaf) {
+                    Write-Output "Running Python checks with virtual environment..."
+                    Invoke-CommandChecked -Command $venvPython -Arguments @("-m", "pytest", "-q") -FailureMessage "Python tests failed."
+                } else {
+                    $pythonAvailable = Get-Command "python" -ErrorAction SilentlyContinue
+                    $pyAvailable = Get-Command "py" -ErrorAction SilentlyContinue
+                    if ($pythonAvailable) {
+                        Write-Output "Running Python checks with system python..."
+                        Invoke-CommandChecked -Command "python" -Arguments @("-m", "pytest", "-q") -FailureMessage "Python tests failed."
+                    } elseif ($pyAvailable) {
+                        Write-Output "Running Python checks with py launcher..."
+                        if (-not [string]::IsNullOrWhiteSpace($PythonTargetVersion)) {
+                            Invoke-CommandChecked -Command "py" -Arguments @("-$PythonTargetVersion", "-m", "pytest", "-q") -FailureMessage "Python tests failed."
+                        } else {
+                            Invoke-CommandChecked -Command "py" -Arguments @("-3", "-m", "pytest", "-q") -FailureMessage "Python tests failed."
+                        }
+                    } else {
+                        throw "No Python interpreter available for checks."
+                    }
+                }
+
+                $dockerCmd = Get-Command "docker" -ErrorAction SilentlyContinue
+                if ($dockerCmd) {
+                    Write-Output "Validating docker compose configuration..."
+                    Invoke-CommandChecked -Command "docker" -Arguments @("compose", "config", "-q") -FailureMessage "docker compose config validation failed."
+                } else {
+                    Write-Warning "Skipping Docker check: docker command not found."
+                }
+            }
+            finally {
+                Pop-Location
             }
         }
         default {
@@ -325,7 +511,7 @@ function Run-TemplateChecks {
     }
 }
 
-function Resolve-UserPackages {
+function Resolve-UserPackage {
     param(
         [Parameter(Mandatory = $true)][string]$TemplateName,
         [string]$SpecFilePath,
@@ -403,7 +589,7 @@ if ($module -match "^[0-9]") {
     $module = "app_$module"
 }
 
-if ($Template -eq "python-tool") {
+if ($Template -in @("python-tool", "python-fastapi-service")) {
     $defaultPackagePath = Join-Path $targetPath "src\app"
     $modulePackagePath = Join-Path $targetPath ("src\" + $module)
     if ($module -ne "app" -and (Test-Path -Path $defaultPackagePath -PathType Container)) {
@@ -413,7 +599,9 @@ if ($Template -eq "python-tool") {
         Copy-Item -Path $defaultPackagePath -Destination $modulePackagePath -Recurse -Force
         Remove-Item -Path $defaultPackagePath -Recurse -Force -ErrorAction Stop
     }
+}
 
+if ($Template -in @("python-tool", "python-fastapi-service", "dockerized-service")) {
     $pythonGitignorePath = Join-Path $targetPath ".gitignore"
     if (Test-Path -Path $pythonGitignorePath -PathType Leaf) {
         $venvIgnoreEntry = $PythonVenvName.Replace("\", "/").Trim()
@@ -439,8 +627,11 @@ $tokens = @{
 
 $textExtensions = @(
     ".md", ".txt", ".toml", ".json", ".yaml", ".yml",
-    ".ps1", ".psm1", ".go", ".mod", ".sum", ".js", ".mjs", ".cjs",
-    ".py", ".dart", ".kt", ".kts", ".html", ".css",
+    ".ps1", ".psm1", ".cmd", ".bat", ".ini",
+    ".go", ".mod", ".sum",
+    ".js", ".mjs", ".cjs", ".ts", ".tsx",
+    ".py", ".dart", ".kt", ".kts",
+    ".html", ".css",
     ".env", ".gradle", ".xml"
 )
 $textNames = @(".gitignore", ".env.example", "Makefile")
@@ -461,13 +652,30 @@ Get-ChildItem -Path $targetPath -Recurse -File | ForEach-Object {
     }
 
     if ($updated -ne $content) {
-        Set-Content -Path $_.FullName -Value $updated
+        $saved = $false
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            try {
+                [System.IO.File]::WriteAllText($_.FullName, $updated, [System.Text.UTF8Encoding]::new($false))
+                $saved = $true
+                break
+            }
+            catch {
+                if ($attempt -eq 5) {
+                    throw
+                }
+                Start-Sleep -Milliseconds (100 * $attempt)
+            }
+        }
+
+        if (-not $saved) {
+            throw "Failed to update file: $($_.FullName)"
+        }
     }
 }
 
 if ($InstallDeps) {
-    $userPackages = Resolve-UserPackages -TemplateName $Template -SpecFilePath $DependencySpecFile -InlinePackages $AdditionalPackages
-    Install-TemplateDependencies `
+    $userPackages = Resolve-UserPackage -TemplateName $Template -SpecFilePath $DependencySpecFile -InlinePackages $AdditionalPackages
+    Install-TemplateDependency `
         -TemplateName $Template `
         -ProjectPath $targetPath `
         -UserPackages $userPackages `
@@ -477,7 +685,7 @@ if ($InstallDeps) {
 }
 
 if ($RunChecks) {
-    Run-TemplateChecks `
+    Invoke-TemplateCheck `
         -TemplateName $Template `
         -ProjectPath $targetPath `
         -PythonVenv $PythonVenvName `

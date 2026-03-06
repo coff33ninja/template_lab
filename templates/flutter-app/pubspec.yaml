@@ -1,4 +1,4 @@
-name: {{project_slug}}
+name: "{{project_slug}}"
 description: Starter scaffold for Flutter experiments.
 publish_to: "none"
 version: 0.1.0+1

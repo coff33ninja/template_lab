@@ -1,0 +1,13 @@
+{
+  "name": "{{project_slug}}",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test -ws --if-present",
+    "build": "npm run build -ws --if-present"
+  }
+}

@@ -1,4 +1,9 @@
+# Ignore local scratch folders used for scaffold smoke tests
+_tmp/
+_tmp_new/
+_tmp_boot/
+_test_bootstrap/
+_tmp_repo_test/
 
-
-#Ignore vscode AI rules
-.github\instructions\codacy.instructions.md
+# Ignore Codacy local rule file if present
+.github/instructions/codacy.instructions.md

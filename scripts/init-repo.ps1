@@ -18,14 +18,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Require-Command {
+function Get-RequiredCommand {
     param([Parameter(Mandatory = $true)][string]$Name)
-    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if (-not $command) {
         throw "Required command not found: $Name"
     }
+    return $command
 }
 
-Require-Command -Name "git"
+[void](Get-RequiredCommand -Name "git")
 
 $projectPath = (Resolve-Path -LiteralPath $Path).Path
 Push-Location $projectPath
@@ -78,7 +80,7 @@ try {
     }
 
     if ($CreateGitHub) {
-        Require-Command -Name "gh"
+        [void](Get-RequiredCommand -Name "gh")
 
         $repoName = if ([string]::IsNullOrWhiteSpace($GitHubRepo)) {
             Split-Path -Leaf $projectPath
