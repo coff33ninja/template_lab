@@ -1,5 +1,7 @@
 # {{project_name}}
 
+Project slug: {{project_slug}}
+
 Flutter full-platform scaffold.
 
 This template is designed to materialize all platform folders.

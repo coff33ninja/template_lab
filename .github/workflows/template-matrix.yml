@@ -1,0 +1,78 @@
+name: Template Matrix
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  manifest-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate matrix from manifest
+        id: generate
+        shell: pwsh
+        run: |
+          $manifest = Get-Content -LiteralPath templates/manifest.json -Raw | ConvertFrom-Json -AsHashtable
+          $matrix = @{ template = @($manifest.templates.Keys | Sort-Object) }
+          $json = $matrix | ConvertTo-Json -Compress
+          "matrix=$json" >> $env:GITHUB_OUTPUT
+
+  contract-tests:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run template contract tests
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File scripts/test-template-contract.ps1
+
+  scaffold-matrix:
+    runs-on: windows-latest
+    needs:
+      - manifest-matrix
+      - contract-tests
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.manifest-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preflight (non-blocking)
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File scripts/preflight.ps1 -Template "${{ matrix.template }}" -Phase all
+
+      - name: Scaffold template with deps/checks
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP "template-lab-output"
+          New-Item -Path $dest -ItemType Directory -Force | Out-Null
+          $name = "ci-${{ matrix.template }}"
+          pwsh -NoProfile -File scripts/new-project.ps1 `
+            -Template "${{ matrix.template }}" `
+            -Name $name `
+            -Destination $dest `
+            -Force `
+            -InstallDeps `
+            -RunChecks `
+            -SkipChecksOnMissingTool
+
+      - name: Assert scaffold log exists
+        shell: pwsh
+        run: |
+          $projectPath = Join-Path (Join-Path $env:RUNNER_TEMP "template-lab-output") "ci-${{ matrix.template }}"
+          $logPath = Join-Path $projectPath "scaffold.log"
+          if (-not (Test-Path -LiteralPath $logPath -PathType Leaf)) {
+            throw "Expected scaffold.log at $logPath"
+          }

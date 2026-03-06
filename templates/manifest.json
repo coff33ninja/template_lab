@@ -1,0 +1,376 @@
+{
+  "version": "1.1.0",
+  "templates": {
+    "cmd-batch-tool": {
+      "install_strategy": "none",
+      "check_strategy": "cmd_smoke",
+      "supports_additional_packages": false,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [],
+        "check": [
+          "cmd"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "tool.cmd",
+        "tests/smoke.cmd"
+      ],
+      "entrypoint": "tool.cmd",
+      "test_file": "tests/smoke.cmd"
+    },
+    "python-tool": {
+      "install_strategy": "python_pyproject",
+      "check_strategy": "python_pytest",
+      "supports_additional_packages": true,
+      "python_module_template": true,
+      "required_tools": {
+        "install": [
+          "python"
+        ],
+        "check": [
+          "python"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "pyproject.toml",
+        "src/app/main.py",
+        "tests/test_main.py"
+      ],
+      "entrypoint": "src/app/main.py",
+      "test_file": "tests/test_main.py"
+    },
+    "python-fastapi-service": {
+      "install_strategy": "python_pyproject",
+      "check_strategy": "python_pytest",
+      "supports_additional_packages": true,
+      "python_module_template": true,
+      "required_tools": {
+        "install": [
+          "python"
+        ],
+        "check": [
+          "python"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "pyproject.toml",
+        "src/app/main.py",
+        "tests/test_health.py"
+      ],
+      "entrypoint": "src/app/main.py",
+      "test_file": "tests/test_health.py"
+    },
+    "node-api": {
+      "install_strategy": "npm",
+      "check_strategy": "npm_test",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "npm"
+        ],
+        "check": [
+          "npm"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "package.json",
+        "src/index.js",
+        "tests/api.test.js"
+      ],
+      "entrypoint": "src/index.js",
+      "test_file": "tests/api.test.js"
+    },
+    "typescript-node-api": {
+      "install_strategy": "npm",
+      "check_strategy": "ts_npm",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "npm"
+        ],
+        "check": [
+          "npm"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "package.json",
+        "tsconfig.json",
+        "src/index.ts",
+        "tests/status.test.ts"
+      ],
+      "entrypoint": "src/index.ts",
+      "test_file": "tests/status.test.ts"
+    },
+    "go-service": {
+      "install_strategy": "go",
+      "check_strategy": "go_test",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "go"
+        ],
+        "check": [
+          "go"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "go.mod",
+        "cmd/app/main.go",
+        "test/api_test.go"
+      ],
+      "entrypoint": "cmd/app/main.go",
+      "test_file": "test/api_test.go"
+    },
+    "go-cli-tool": {
+      "install_strategy": "go",
+      "check_strategy": "go_cli",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "go"
+        ],
+        "check": [
+          "go"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "go.mod",
+        "cmd/app/main.go",
+        "test/commands_test.go"
+      ],
+      "entrypoint": "cmd/app/main.go",
+      "test_file": "test/commands_test.go"
+    },
+    "flutter-app": {
+      "install_strategy": "flutter",
+      "check_strategy": "flutter_test",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "flutter"
+        ],
+        "check": [
+          "flutter"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "pubspec.yaml",
+        "lib/main.dart",
+        "test/widget_test.dart"
+      ],
+      "entrypoint": "lib/main.dart",
+      "test_file": "test/widget_test.dart"
+    },
+    "flutter-full-app": {
+      "install_strategy": "flutter_full",
+      "check_strategy": "flutter_test",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "flutter"
+        ],
+        "check": [
+          "flutter"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "pubspec.yaml",
+        "lib/main.dart",
+        "test/widget_test.dart"
+      ],
+      "entrypoint": "lib/main.dart",
+      "test_file": "test/widget_test.dart"
+    },
+    "kotlin-android": {
+      "install_strategy": "gradle",
+      "check_strategy": "gradle_test",
+      "supports_additional_packages": false,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "gradle"
+        ],
+        "check": [
+          "gradle"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "build.gradle.kts",
+        "app/build.gradle.kts",
+        "app/src/main/java/com/example/app/MainActivity.kt"
+      ],
+      "entrypoint": "app/src/main/java/com/example/app/MainActivity.kt",
+      "test_file": "app/src/main/res/layout/activity_main.xml"
+    },
+    "kotlin-jvm-cli": {
+      "install_strategy": "gradle",
+      "check_strategy": "gradle_test",
+      "supports_additional_packages": false,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "gradle"
+        ],
+        "check": [
+          "gradle"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "build.gradle.kts",
+        "settings.gradle.kts",
+        "src/main/kotlin/app/Main.kt",
+        "src/test/kotlin/app/MainTest.kt"
+      ],
+      "entrypoint": "src/main/kotlin/app/Main.kt",
+      "test_file": "src/test/kotlin/app/MainTest.kt"
+    },
+    "fullstack-monorepo": {
+      "install_strategy": "npm_workspace",
+      "check_strategy": "npm_workspace_test",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "npm"
+        ],
+        "check": [
+          "npm"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "package.json",
+        "apps/api/package.json",
+        "apps/web/package.json",
+        "packages/shared/package.json"
+      ],
+      "entrypoint": "apps/api/src/index.ts",
+      "test_file": "apps/api/tests/health.test.ts"
+    },
+    "dockerized-service": {
+      "install_strategy": "python_requirements",
+      "check_strategy": "python_pytest_docker",
+      "supports_additional_packages": true,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [
+          "python"
+        ],
+        "check": [
+          "python"
+        ]
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "Dockerfile",
+        "docker-compose.yml",
+        "app/main.py",
+        "tests/test_health.py"
+      ],
+      "entrypoint": "app/main.py",
+      "test_file": "tests/test_health.py"
+    },
+    "powershell-tool": {
+      "install_strategy": "none",
+      "check_strategy": "none",
+      "supports_additional_packages": false,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [],
+        "check": []
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "tool.ps1",
+        "modules/helpers.psm1"
+      ],
+      "entrypoint": "tool.ps1",
+      "test_file": "scripts/install.ps1"
+    },
+    "web-static": {
+      "install_strategy": "none",
+      "check_strategy": "none",
+      "supports_additional_packages": false,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [],
+        "check": []
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "index.html",
+        "scripts/app.js",
+        "styles/site.css"
+      ],
+      "entrypoint": "index.html",
+      "test_file": "scripts/app.js"
+    },
+    "mad-lab": {
+      "install_strategy": "none",
+      "check_strategy": "none",
+      "supports_additional_packages": false,
+      "python_module_template": false,
+      "required_tools": {
+        "install": [],
+        "check": []
+      },
+      "required_files": [
+        "README.md",
+        ".gitignore",
+        ".gitattributes",
+        "ideas.md",
+        "experiments/.gitkeep"
+      ],
+      "entrypoint": "README.md",
+      "test_file": "ideas.md"
+    }
+  }
+}

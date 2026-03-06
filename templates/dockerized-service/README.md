@@ -1,5 +1,7 @@
 # {{project_name}}
 
+Project slug: {{project_slug}}
+
 Dockerized FastAPI service scaffold.
 
 ## Local run

@@ -1,5 +1,7 @@
 # {{project_name}}
 
+Project slug: {{project_slug}}
+
 Multi-project idea lab.
 
 ## Suggested flow

@@ -12,6 +12,21 @@
 - Keep version control of installed deps user-driven (`-AdditionalPackages` or `-DependencySpecFile`).
 - Keep first-pass verification scriptable (`-RunChecks`) before first commit.
 
+## Manifest contract
+
+Template behavior is defined in `templates/manifest.json`.
+
+Each template entry declares:
+
+- install/check strategy keys
+- required tools for install/check phases
+- required file paths
+- entrypoint and test-file contract paths
+- whether additional packages are supported
+- whether module token remapping is required
+
+These are validated by `scripts/test-template-contract.ps1` and consumed by `scripts/new-project.ps1`.
+
 ## `cmd-batch-tool`
 CMD batch utility scaffold with a smoke check command.
 

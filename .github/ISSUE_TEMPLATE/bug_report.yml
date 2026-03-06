@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible problem with templates or scripts.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What failed?
+      placeholder: A short bug summary.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Exact command and environment details.
+      placeholder: |
+        pwsh -File scripts/new-project.ps1 ...
+        PowerShell version, OS, tool versions
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Include scaffold.log and relevant command output.
+      render: shell
